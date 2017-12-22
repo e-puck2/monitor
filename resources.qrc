@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/speaker.png</file>
+        <file>images/charging.png</file>
+        <file>images/mute.png</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,305 @@
+\section{EpuckMonitor Class Reference}
+\label{class_epuck_monitor}\index{EpuckMonitor@{EpuckMonitor}}
+Main window class.  
+
+
+{\tt \#include $<$epuckMonitor.h$>$}
+
+\subsection*{Public Slots}
+\begin{CompactItemize}
+\item 
+void {\bf connect} ()
+\item 
+void {\bf disconnect} ()
+\item 
+void {\bf updateParameters} ()
+\item 
+void {\bf goUp} ()
+\item 
+void {\bf goDown} ()
+\item 
+void {\bf goLeft} ()
+\item 
+void {\bf goRight} ()
+\item 
+void {\bf stop} ()
+\item 
+void {\bf led0} ()
+\item 
+void {\bf led1} ()
+\item 
+void {\bf led2} ()
+\item 
+void {\bf led3} ()
+\item 
+void {\bf led4} ()
+\item 
+void {\bf led5} ()
+\item 
+void {\bf led6} ()
+\item 
+void {\bf led7} ()
+\item 
+void {\bf led8} ()
+\item 
+void {\bf led9} ()
+\item 
+void {\bf sound1} ()
+\item 
+void {\bf sound2} ()
+\item 
+void {\bf sound3} ()
+\item 
+void {\bf sound4} ()
+\item 
+void {\bf sound5} ()
+\item 
+void {\bf sensorActivation} ()
+\item 
+void {\bf continuousActivation} ()
+\item 
+void {\bf updateSpeed} ()
+\item 
+void {\bf binarySensorsUpdate} ()
+\item 
+void {\bf asciiSensorsUpdate} ()
+\item 
+void {\bf cameraUpdate} ()
+\item 
+void {\bf getImage} ()
+\end{CompactItemize}
+\subsection*{Public Member Functions}
+\begin{CompactItemize}
+\item 
+void {\bf activateThreads} ()
+\item 
+void {\bf deactivateThreads} ()
+\end{CompactItemize}
+\subsection*{Public Attributes}
+\begin{CompactItemize}
+\item 
+int {\bf motorSpeed}
+\item 
+{\bf MyThread} $\ast$ {\bf binarySensorThread}
+\item 
+{\bf MyThread2} $\ast$ {\bf asciiSensorThread}
+\item 
+{\bf ThreadCapture} $\ast$ {\bf cameraThread}
+\item 
+bool {\bf imgReceived}
+\item 
+{\bf SerialComm} $\ast$ {\bf serial}
+\end{CompactItemize}
+
+
+\subsection{Detailed Description}
+Main window class. 
+
+\begin{Desc}
+\item[Author:]Stefano Morgani \end{Desc}
+\begin{Desc}
+\item[Version:]1.0 \end{Desc}
+\begin{Desc}
+\item[Date:]10/2/08\end{Desc}
+This class contains all the graphical objects that are visualized in the main window; moreover it starts and stops all the threads used to communicate with the E-Puck robot. 
+
+\subsection{Member Function Documentation}
+\index{EpuckMonitor@{EpuckMonitor}!activateThreads@{activateThreads}}
+\index{activateThreads@{activateThreads}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[activateThreads]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::activateThreads ()}\label{class_epuck_monitor_fa52970de82a7f5f008d8c46f06867fe}
+
+
+activate the threads accordingly to the user specification (checkboxes \char`\"{}Activate Sensors\char`\"{} and \char`\"{}Continuous\char`\"{}) \index{EpuckMonitor@{EpuckMonitor}!deactivateThreads@{deactivateThreads}}
+\index{deactivateThreads@{deactivateThreads}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[deactivateThreads]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::deactivateThreads ()}\label{class_epuck_monitor_498c9deec736871065f3b7d54d76266c}
+
+
+deactivate all the running threads \index{EpuckMonitor@{EpuckMonitor}!connect@{connect}}
+\index{connect@{connect}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[connect]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::connect ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_3c03db62890a608f2a3a914fed007394}
+
+
+called when the \char`\"{}Connect\char`\"{} button is clicked; initialize the connection and the threads \index{EpuckMonitor@{EpuckMonitor}!disconnect@{disconnect}}
+\index{disconnect@{disconnect}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[disconnect]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::disconnect ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_7363eab26b1fe7803bd3b7ffdde744d3}
+
+
+called when the \char`\"{}Disconnect\char`\"{} button is clicked; stop the connection and the threads if they are running \index{EpuckMonitor@{EpuckMonitor}!updateParameters@{updateParameters}}
+\index{updateParameters@{updateParameters}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[updateParameters]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::updateParameters ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_656bc6eba2a27f23a5986f2280d01d3e}
+
+
+called when the \char`\"{}Send Parameters\char`\"{} button is clicked; send the command to the robot to change the camera parameters \index{EpuckMonitor@{EpuckMonitor}!goUp@{goUp}}
+\index{goUp@{goUp}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[goUp]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::goUp ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_f4cd6654cbb249be162cd80465e96d91}
+
+
+called when the \char`\"{}F\char`\"{} button is clicked; send the command to move forward the robot \index{EpuckMonitor@{EpuckMonitor}!goDown@{goDown}}
+\index{goDown@{goDown}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[goDown]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::goDown ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_6a55397863ccb1384d7589ec482631c8}
+
+
+called when the \char`\"{}B\char`\"{} button is clicked; send the command to move backward the robot \index{EpuckMonitor@{EpuckMonitor}!goLeft@{goLeft}}
+\index{goLeft@{goLeft}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[goLeft]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::goLeft ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_103e3427363b552bc3be3b66ab269bc4}
+
+
+called when the \char`\"{}L\char`\"{} button is clicked; send the command to turn left the robot \index{EpuckMonitor@{EpuckMonitor}!goRight@{goRight}}
+\index{goRight@{goRight}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[goRight]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::goRight ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_7d47025f0c339c1298149a9deb259552}
+
+
+called when the \char`\"{}R\char`\"{} button is clicked; send the command to turn right the robot \index{EpuckMonitor@{EpuckMonitor}!stop@{stop}}
+\index{stop@{stop}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[stop]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::stop ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_793d38089fec419e6c2b09221627fd3c}
+
+
+called when the \char`\"{}S\char`\"{} button is clicked; send the command to stop the robot \index{EpuckMonitor@{EpuckMonitor}!led0@{led0}}
+\index{led0@{led0}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led0]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led0 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_c382f09602b6b18e100964852cc47993}
+
+
+called when the \char`\"{}LED0\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED0 \index{EpuckMonitor@{EpuckMonitor}!led1@{led1}}
+\index{led1@{led1}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led1]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led1 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_71840ca700ad930ffe2a020d9244bc55}
+
+
+called when the \char`\"{}LED1\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED1 \index{EpuckMonitor@{EpuckMonitor}!led2@{led2}}
+\index{led2@{led2}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led2]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led2 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_8573015ad490428566487950eba459e2}
+
+
+called when the \char`\"{}LED2\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED2 \index{EpuckMonitor@{EpuckMonitor}!led3@{led3}}
+\index{led3@{led3}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led3]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led3 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_05e028150ac8910a5637bdc2316e3c2a}
+
+
+called when the \char`\"{}LED3\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED3 \index{EpuckMonitor@{EpuckMonitor}!led4@{led4}}
+\index{led4@{led4}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led4]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led4 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_15df7a1da0f09cda9d443f8fc854384e}
+
+
+called when the \char`\"{}LED4\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED4 \index{EpuckMonitor@{EpuckMonitor}!led5@{led5}}
+\index{led5@{led5}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led5]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led5 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_36c0b2f6c197bf05c98daefe688507f0}
+
+
+called when the \char`\"{}LED5\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED5 \index{EpuckMonitor@{EpuckMonitor}!led6@{led6}}
+\index{led6@{led6}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led6]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led6 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_d0862c4fac3bc9f7d3a145d388a49c94}
+
+
+called when the \char`\"{}LED6\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED6 \index{EpuckMonitor@{EpuckMonitor}!led7@{led7}}
+\index{led7@{led7}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led7]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led7 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_d09cdfcc0df33f4bb51d7558e067ef87}
+
+
+called when the \char`\"{}LED7\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the LED7 \index{EpuckMonitor@{EpuckMonitor}!led8@{led8}}
+\index{led8@{led8}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led8]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led8 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_bfac032fdd0f6a7375fb268b4314e4ad}
+
+
+called when the \char`\"{}LED8\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the body led \index{EpuckMonitor@{EpuckMonitor}!led9@{led9}}
+\index{led9@{led9}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[led9]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::led9 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_e0cf52813c30554e1d0049ecec70888f}
+
+
+called when the \char`\"{}LED9\char`\"{} checkbox is checked/unchecked; send the command to turn on/off the front led \index{EpuckMonitor@{EpuckMonitor}!sound1@{sound1}}
+\index{sound1@{sound1}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[sound1]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::sound1 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_73e74fc98e3c7051762a402c22bfc3b6}
+
+
+called when the \char`\"{}1\char`\"{} button is clicked; send the command to play the first sound \index{EpuckMonitor@{EpuckMonitor}!sound2@{sound2}}
+\index{sound2@{sound2}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[sound2]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::sound2 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_282f05a6e86d60deb23a10c89fd73ea6}
+
+
+called when the \char`\"{}2\char`\"{} button is clicked; send the command to play the second sound \index{EpuckMonitor@{EpuckMonitor}!sound3@{sound3}}
+\index{sound3@{sound3}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[sound3]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::sound3 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_fe5f532c19bb0753e3c212c3029b7647}
+
+
+called when the \char`\"{}3\char`\"{} button is clicked; send the command to play the third sound \index{EpuckMonitor@{EpuckMonitor}!sound4@{sound4}}
+\index{sound4@{sound4}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[sound4]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::sound4 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_3fa5a8b7934774562efd8eddc34a570b}
+
+
+called when the \char`\"{}4\char`\"{} button is clicked; send the command to play the fourth sound \index{EpuckMonitor@{EpuckMonitor}!sound5@{sound5}}
+\index{sound5@{sound5}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[sound5]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::sound5 ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_f6d3eb7aca1bf0d5e9504a62e14a1205}
+
+
+called when the \char`\"{}5\char`\"{} button is clicked; send the command to play the fifth sound \index{EpuckMonitor@{EpuckMonitor}!sensorActivation@{sensorActivation}}
+\index{sensorActivation@{sensorActivation}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[sensorActivation]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::sensorActivation ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_7f49e9ce6e066fab7fd0ad8617bc1348}
+
+
+called when the \char`\"{}Activate Sensors\char`\"{} checkbox is checked/unchecked; activate/deactivate the threads for receiveing data from the sensors \index{EpuckMonitor@{EpuckMonitor}!continuousActivation@{continuousActivation}}
+\index{continuousActivation@{continuousActivation}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[continuousActivation]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::continuousActivation ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_691cb13b9e28bb2f70164ff6da2ce8d6}
+
+
+called when the \char`\"{}Continuous\char`\"{} checkbox is checked/unchecked; activate/deactivate the thread for receiveing images from the camera \index{EpuckMonitor@{EpuckMonitor}!updateSpeed@{updateSpeed}}
+\index{updateSpeed@{updateSpeed}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[updateSpeed]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::updateSpeed ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_f20693c88050ccaf6d5d129590c4e1df}
+
+
+called when the slider changes its state; update the \char`\"{}motorSpeed\char`\"{} variable accordingly \index{EpuckMonitor@{EpuckMonitor}!binarySensorsUpdate@{binarySensorsUpdate}}
+\index{binarySensorsUpdate@{binarySensorsUpdate}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[binarySensorsUpdate]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::binarySensorsUpdate ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_b5b70216105f85f5a64d7d23746c55b6}
+
+
+called when the \char`\"{}binaraySensorThread\char`\"{} terminates; update the graphical objects accordingly to the received data \index{EpuckMonitor@{EpuckMonitor}!asciiSensorsUpdate@{asciiSensorsUpdate}}
+\index{asciiSensorsUpdate@{asciiSensorsUpdate}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[asciiSensorsUpdate]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::asciiSensorsUpdate ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_bf61dd305cede300a35a8bcd372855d7}
+
+
+called when the \char`\"{}asciiSensorThread\char`\"{} terminates; update the graphical objects accordingly to the received data \index{EpuckMonitor@{EpuckMonitor}!cameraUpdate@{cameraUpdate}}
+\index{cameraUpdate@{cameraUpdate}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[cameraUpdate]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::cameraUpdate ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_a790a80f992f172a214c8c4fc1adf3ad}
+
+
+called when the \char`\"{}cameraThread\char`\"{} terminates; update the image accordingly to the received data \index{EpuckMonitor@{EpuckMonitor}!getImage@{getImage}}
+\index{getImage@{getImage}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[getImage]{\setlength{\rightskip}{0pt plus 5cm}void EpuckMonitor::getImage ()\hspace{0.3cm}{\tt  [slot]}}\label{class_epuck_monitor_be3791401d9c1e391be653501d39b8d8}
+
+
+called when the \char`\"{}Get Image\char`\"{} button is clicked; start the \char`\"{}cameraThread\char`\"{} in order to receive an image from the robot 
+
+\subsection{Member Data Documentation}
+\index{EpuckMonitor@{EpuckMonitor}!motorSpeed@{motorSpeed}}
+\index{motorSpeed@{motorSpeed}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[motorSpeed]{\setlength{\rightskip}{0pt plus 5cm}int {\bf EpuckMonitor::motorSpeed}}\label{class_epuck_monitor_efc056f1a06f5e79fe38bf90e34e1799}
+
+
+used to store the value of the velocity changed with the slider \index{EpuckMonitor@{EpuckMonitor}!binarySensorThread@{binarySensorThread}}
+\index{binarySensorThread@{binarySensorThread}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[binarySensorThread]{\setlength{\rightskip}{0pt plus 5cm}{\bf MyThread}$\ast$ {\bf EpuckMonitor::binarySensorThread}}\label{class_epuck_monitor_042d510fbebc75937f243b57769f3020}
+
+
+thread pointer to \doxyref{MyThread}{p.}{class_my_thread}, desigend to send binary commands to the E-Puck robot \index{EpuckMonitor@{EpuckMonitor}!asciiSensorThread@{asciiSensorThread}}
+\index{asciiSensorThread@{asciiSensorThread}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[asciiSensorThread]{\setlength{\rightskip}{0pt plus 5cm}{\bf MyThread2}$\ast$ {\bf EpuckMonitor::asciiSensorThread}}\label{class_epuck_monitor_aacda8d868e7ebe273720a8191d017a2}
+
+
+thread pointer to \doxyref{MyThread2}{p.}{class_my_thread2}, designed to send ascii commands to the E-Puck robot \index{EpuckMonitor@{EpuckMonitor}!cameraThread@{cameraThread}}
+\index{cameraThread@{cameraThread}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[cameraThread]{\setlength{\rightskip}{0pt plus 5cm}{\bf ThreadCapture}$\ast$ {\bf EpuckMonitor::cameraThread}}\label{class_epuck_monitor_f8bc83c0468160869e05cd25a61b6304}
+
+
+thread pointer to \doxyref{ThreadCapture}{p.}{class_thread_capture}, designed to receive images from the E-Puck robot \index{EpuckMonitor@{EpuckMonitor}!imgReceived@{imgReceived}}
+\index{imgReceived@{imgReceived}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[imgReceived]{\setlength{\rightskip}{0pt plus 5cm}bool {\bf EpuckMonitor::imgReceived}}\label{class_epuck_monitor_a425948183f45af25fe88b18cd3af342}
+
+
+indicate whether or not the image was received completely \index{EpuckMonitor@{EpuckMonitor}!serial@{serial}}
+\index{serial@{serial}!EpuckMonitor@{EpuckMonitor}}
+\subsubsection[serial]{\setlength{\rightskip}{0pt plus 5cm}{\bf SerialComm}$\ast$ {\bf EpuckMonitor::serial}}\label{class_epuck_monitor_a6f39e100d8b21918dff9deaf8a477c6}
+
+
+pointer to the serial port for the bluetooth device (Linux, MacOS) 
+
+The documentation for this class was generated from the following files:\begin{CompactItemize}
+\item 
+/Users/stefano/Desktop/Lavoro/MultiPlatformMonitor/MultiPlatformMonitorSrc/epuckMonitor.h\item 
+/Users/stefano/Desktop/Lavoro/MultiPlatformMonitor/MultiPlatformMonitorSrc/epuckMonitor.cpp\end{CompactItemize}

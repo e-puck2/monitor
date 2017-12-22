@@ -1,0 +1,51 @@
+\section{ThreadCapture Class Reference}
+\label{class_thread_capture}\index{ThreadCapture@{ThreadCapture}}
+Thread designed to receive images from the robot.  
+
+
+{\tt \#include $<$ThreadCapture.h$>$}
+
+\subsection*{Public Attributes}
+\begin{CompactItemize}
+\item 
+bool {\bf headerReceived}
+\item 
+bool {\bf imgReceived}
+\item 
+bool {\bf wrongAnswer}
+\end{CompactItemize}
+
+
+\subsection{Detailed Description}
+Thread designed to receive images from the robot. 
+
+\begin{Desc}
+\item[Author:]Stefano Morgani \end{Desc}
+\begin{Desc}
+\item[Version:]1.0 \end{Desc}
+\begin{Desc}
+\item[Date:]11/22/08\end{Desc}
+This class send a request command for an image to the E-Puck robot and saves the header and data of the image in private variables. 
+
+\subsection{Member Data Documentation}
+\index{ThreadCapture@{ThreadCapture}!headerReceived@{headerReceived}}
+\index{headerReceived@{headerReceived}!ThreadCapture@{ThreadCapture}}
+\subsubsection[headerReceived]{\setlength{\rightskip}{0pt plus 5cm}bool {\bf ThreadCapture::headerReceived}}\label{class_thread_capture_1c7374d43d4fe098f9dd5cd19b0327e1}
+
+
+boolean indicating whether or not the first three bytes of the image data (header) was received \index{ThreadCapture@{ThreadCapture}!imgReceived@{imgReceived}}
+\index{imgReceived@{imgReceived}!ThreadCapture@{ThreadCapture}}
+\subsubsection[imgReceived]{\setlength{\rightskip}{0pt plus 5cm}bool {\bf ThreadCapture::imgReceived}}\label{class_thread_capture_8432b3edf300d289b2d419f6da0b2bde}
+
+
+boolean indicating whether or not the image was received completely \index{ThreadCapture@{ThreadCapture}!wrongAnswer@{wrongAnswer}}
+\index{wrongAnswer@{wrongAnswer}!ThreadCapture@{ThreadCapture}}
+\subsubsection[wrongAnswer]{\setlength{\rightskip}{0pt plus 5cm}bool {\bf ThreadCapture::wrongAnswer}}\label{class_thread_capture_170678562a7c37d44c162613b2ce42cb}
+
+
+boolean indicating whether or not a wrong header was received 
+
+The documentation for this class was generated from the following files:\begin{CompactItemize}
+\item 
+/Users/stefano/Desktop/Lavoro/MultiPlatformMonitor/MultiPlatformMonitorSrc/ThreadCapture.h\item 
+/Users/stefano/Desktop/Lavoro/MultiPlatformMonitor/MultiPlatformMonitorSrc/ThreadCapture.cpp\end{CompactItemize}

@@ -1,0 +1,98 @@
+\section{SerialComm Class Reference}
+\label{class_serial_comm}\index{SerialComm@{SerialComm}}
+Class handling the serial communication under Linux/MacOS systems.  
+
+
+{\tt \#include $<$SerialComm.h$>$}
+
+\subsection*{Public Member Functions}
+\begin{CompactItemize}
+\item 
+int {\bf connect} (char $\ast$path)
+\item 
+void {\bf disconnect} ()
+\item 
+int {\bf writeData} (char $\ast$buf, int num\_\-bytes, int usleep\_\-time)
+\item 
+int {\bf readData} (char $\ast$buf, int num\_\-bytes, int usleep\_\-time)
+\item 
+void {\bf flush} ()
+\item 
+void {\bf discard} (int num\_\-bytes)
+\end{CompactItemize}
+
+
+\subsection{Detailed Description}
+Class handling the serial communication under Linux/MacOS systems. 
+
+\begin{Desc}
+\item[Author:]Stefano Morgani \end{Desc}
+\begin{Desc}
+\item[Version:]1.0 \end{Desc}
+\begin{Desc}
+\item[Date:]11/18/08\end{Desc}
+This class contains all the functions needed to communicate with the E-Puck robot. 
+
+\subsection{Member Function Documentation}
+\index{SerialComm@{SerialComm}!connect@{connect}}
+\index{connect@{connect}!SerialComm@{SerialComm}}
+\subsubsection[connect]{\setlength{\rightskip}{0pt plus 5cm}int SerialComm::connect (char $\ast$ {\em path})}\label{class_serial_comm_09d47dff989d5263a903efef942df65e}
+
+
+This function is used to initialize and open the connection to the bluetooth device; the serial settings are: 115200-8-N-1 and no hw/sw control. \begin{Desc}
+\item[Parameters:]
+\begin{description}
+\item[{\em path}]string indicating the path of the device to which the connection will be established (e.g. /dev/tty.e-puck\_\-1594-COM1-1). \end{description}
+\end{Desc}
+\begin{Desc}
+\item[Returns:]returns the file descriptor returned by the \char`\"{}open\char`\"{} function. \end{Desc}
+\index{SerialComm@{SerialComm}!disconnect@{disconnect}}
+\index{disconnect@{disconnect}!SerialComm@{SerialComm}}
+\subsubsection[disconnect]{\setlength{\rightskip}{0pt plus 5cm}void SerialComm::disconnect ()}\label{class_serial_comm_c23973b8ccccfca062a59cfecdd15497}
+
+
+This function closes the connection opened. \index{SerialComm@{SerialComm}!writeData@{writeData}}
+\index{writeData@{writeData}!SerialComm@{SerialComm}}
+\subsubsection[writeData]{\setlength{\rightskip}{0pt plus 5cm}int SerialComm::writeData (char $\ast$ {\em buf}, \/  int {\em num\_\-bytes}, \/  int {\em usleep\_\-time})}\label{class_serial_comm_15f3872a4a2759ecaab6d13876df95c3}
+
+
+This function is used to send data to the device. \begin{Desc}
+\item[Parameters:]
+\begin{description}
+\item[{\em buf}]buffer that contains the characters (command) to be written to the serial port. \item[{\em num\_\-bytes}]the number of bytes that will be written to the serial port (length of the buffer). \item[{\em usleep\_\-time}]specifies the total waiting time before exiting the writing operation in case of errors; the value is specified in microseconds unit. \end{description}
+\end{Desc}
+\begin{Desc}
+\item[Returns:]returns the number of bytes correctly written to the serial port. \end{Desc}
+\index{SerialComm@{SerialComm}!readData@{readData}}
+\index{readData@{readData}!SerialComm@{SerialComm}}
+\subsubsection[readData]{\setlength{\rightskip}{0pt plus 5cm}int SerialComm::readData (char $\ast$ {\em buf}, \/  int {\em num\_\-bytes}, \/  int {\em usleep\_\-time})}\label{class_serial_comm_a3b3d196cda66325cd97f6900e32dc74}
+
+
+This function is used to receive data from the device. \begin{Desc}
+\item[Parameters:]
+\begin{description}
+\item[{\em buf}]buffer that will contain the data received from the device. \item[{\em num\_\-bytes}]the number of bytes to be read from the device (maximum length of the buffer). \item[{\em usleep\_\-time}]specifies the total waiting time before exiting the reading operation in case of errors; the value is specified in microseconds unit. \end{description}
+\end{Desc}
+\begin{Desc}
+\item[Returns:]returns the number of bytes correctly red from the device. \end{Desc}
+\index{SerialComm@{SerialComm}!flush@{flush}}
+\index{flush@{flush}!SerialComm@{SerialComm}}
+\subsubsection[flush]{\setlength{\rightskip}{0pt plus 5cm}void SerialComm::flush ()}\label{class_serial_comm_49335bd844798ce814f8b10d14da4bdf}
+
+
+This function flushes both the input and output buffers. \index{SerialComm@{SerialComm}!discard@{discard}}
+\index{discard@{discard}!SerialComm@{SerialComm}}
+\subsubsection[discard]{\setlength{\rightskip}{0pt plus 5cm}void SerialComm::discard (int {\em num\_\-bytes})}\label{class_serial_comm_f6d4ffe7bfc6e3c466946ae071ab94a8}
+
+
+This function is used to discard data from the input buffer; note that this function is blocking, that is it will continue to read data from the buffer until all the requested bytes are discarded. \begin{Desc}
+\item[Parameters:]
+\begin{description}
+\item[{\em num\_\-bytes}]the number of bytes to be discarded from the input buffer. \end{description}
+\end{Desc}
+
+
+The documentation for this class was generated from the following files:\begin{CompactItemize}
+\item 
+/Users/stefano/Desktop/Lavoro/MultiPlatformMonitor/MultiPlatformMonitorSrc/SerialComm.h\item 
+/Users/stefano/Desktop/Lavoro/MultiPlatformMonitor/MultiPlatformMonitorSrc/SerialComm.cpp\end{CompactItemize}
