@@ -86,7 +86,7 @@ EpuckMonitor::~EpuckMonitor()
 }
 
 void EpuckMonitor::connect() {
-    emit connectToRobot(ui.txtPort->text().toAscii().data());
+    emit connectToRobot(ui.txtPort->text().toLatin1().data());
     return;
 }
 

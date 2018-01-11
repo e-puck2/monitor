@@ -1,22 +1,18 @@
 TEMPLATE	= 	app
 TARGET		=	EPuckMonitor
 DESTDIR		= 	./
-LIBS		+= 	-dead_strip
+LIBS		+=      -lopengl32
 HEADERS		+= 	EpuckMonitor.h CommThread.h glwidget.h
 SOURCES		+= 	main.cpp EpuckMonitor.cpp CommThread.cpp glwidget.cpp
 win32 {
-     SOURCES += comm.cpp
-	HEADERS+= comm.h
-    LIBS += -static-libgcc
+    SOURCES += comm.cpp
+    HEADERS += comm.h
 }
 unix {
-     SOURCES += SerialComm.cpp
-	HEADERS+= SerialComm.h
+    SOURCES += SerialComm.cpp
+    HEADERS += SerialComm.h
 }
 
-CONFIG 		+= 	static separate_debug_info
-QT 		= 	gui core
-FORMS		+= 	main.ui
-#DEFINES 	-= 	UNICODE
-QT += opengl
-RESOURCES += resources.qrc
+QT 		+= core opengl widgets
+FORMS		+= main.ui
+RESOURCES       += resources.qrc

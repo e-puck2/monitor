@@ -41,6 +41,7 @@
 #include "CommThread.h"
 #include "glwidget.h"
 #include <stdio.h>
+#include <QtMath>
 
 class EpuckMonitor : public QMainWindow
 {
