@@ -180,6 +180,18 @@ void EpuckMonitor::binarySensorsUpdate() {
     ui.progressGyroY->setValue(commThread->getGyroRaw(1));
     ui.progressGyroZ->setValue(commThread->getGyroRaw(2));
 
+    // ToF data.
+    ui.lblDist->setText(commThread->getDistanceCmStr());
+    ui.progressDistance->setValue(commThread->getDistanceCm());
+
+    // Button state
+    if(commThread->buttonIsPressed()) {
+        ui.lblBtnState->setText("pressed");
+        ui.pushButton->setChecked(true);
+    } else {
+        ui.lblBtnState->setText("released");
+        ui.pushButton->setChecked(false);
+    }
     return;
 }
 

@@ -25,6 +25,7 @@
  */
 
 #include "CommThread.h"
+#include "EpuckMonitor.h"
 
 void CommThread::init() {
     type = 1;						/**< type of the image: color (value 1) or grayscale (value 0)*/
@@ -135,6 +136,7 @@ void CommThread::run() {
     short  exp=0;
     float flt=0;
     uint8_t bytesToRead = 0;
+    uint8_t bytesToSend = 0;
 
     abortThread = false;
 
@@ -142,26 +144,36 @@ void CommThread::run() {
 
         if(getSensorsData) {
 
-            command[0]=-'A';                        //accelerometer request
-            command[1]=-'N';                        //proximity sensors request
-            command[2]=-'O';                        //ambient light request
             if((int)asercomVer == 1) {
-                command[3]=-'u';                    //microphones request (3 x mic)
+                bytesToSend = 7;
+                command[0]=-'A';                        //accelerometer request
+                command[1]=-'N';                        //proximity sensors request
+                command[2]=-'O';                        //ambient light request
+                command[3]=-'u';                        //microphones request (3 x mic)
+                command[4]=-'b';                        // Battery raw value.
+                command[5]=-'g';                        // Gyro raw value.
+                command[6]=0;                           //binary command ending
             } else {
-                command[3]=-0x0C;                   //microphones request (4 x mic)
+                bytesToSend = 9;
+                command[0]=-'A';                        //accelerometer request
+                command[1]=-'N';                        //proximity sensors request
+                command[2]=-'O';                        //ambient light request
+                command[3]=-0x0C;                       //microphones request (4 x mic)
+                command[4]=-'b';                        // Battery raw value.
+                command[5]=-'g';                        // Gyro raw value.
+                command[6]=-0x0D;                       // ToF sensor value.
+                command[7]=-0x0B;                       // User button state.
+                command[8]=0;                           //binary command ending
             }
-            command[4]=-'b';                        // Battery raw value.
-            command[5]=-'g';                        // Gyro raw value.
-            command[6]=0;                           //binary command ending
 
             //send all the request in one shot
         #ifdef __WIN32__
             comm->PurgeCommPort();
-            comm->WriteBuffer((BYTE*)command, 7);
+            comm->WriteBuffer((BYTE*)command, bytesToSend);
             comm->FlushCommPort();
             Sleep(100);
         #else
-            bytes=comm->writeData(command, 7, 1000000);
+            bytes=comm->writeData(command, bytesToSend, 1000000);
         #endif
 
             //ACCELEROMETER DATA
@@ -408,6 +420,40 @@ void CommThread::run() {
                 gyroRaw[0] = RxBuffer[0]+RxBuffer[1]*256;
                 gyroRaw[1] = RxBuffer[2]+RxBuffer[3]*256;
                 gyroRaw[2] = RxBuffer[4]+RxBuffer[5]*256;
+            }
+
+
+            if((int)asercomVer == 2) {
+
+                // ToF DATA
+                memset(RxBuffer, 0x0, 45);
+            #ifdef __WIN32__
+                bytes=comm->ReadBytes((BYTE*)RxBuffer,2,1000000);
+            #else
+                bytes=comm->readData((char*)RxBuffer,2,1000000);
+            #endif
+                if(bytes<2) {
+                    sprintf(msg, "ToF: only %d bytes red", bytes);
+                    std::cerr << msg << std::endl;
+                    distanceCm = 0;
+                } else {
+                    distanceCm = (uint16_t)(((uint8_t)RxBuffer[1]<<8)|((uint8_t)RxBuffer[0]))/10;
+                    itoa((distanceCm>200)?200:distanceCm, distanceCmStr, 10);
+                }
+
+                // Button state.
+                memset(RxBuffer, 0x0, 45);
+            #ifdef __WIN32__
+                bytes=comm->ReadBytes((BYTE*)RxBuffer,1,1000000);
+            #else
+                bytes=comm->readData((char*)RxBuffer,1,1000000);
+            #endif
+                if(bytes<1) {
+                    sprintf(msg, "Button: only %d bytes red", bytes);
+                    std::cerr << msg << std::endl;
+                } else {
+                    buttonState = RxBuffer[0];
+                }
             }
 
             emit newBinaryData();
@@ -811,22 +857,40 @@ void CommThread::sendUpdateLed0(int state) {
 }
 
 void CommThread::sendUpdateLed1(int state) {
-
+    uint8_t bytesToSend = 0;
     memset(command, 0x0, 20);
 
     if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 1, 1, 0);
+        rgbLedState[0] = rgbLedValue[0];
+        rgbLedState[1] = rgbLedValue[1];
+        rgbLedState[2] = rgbLedValue[2];
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 1, 1, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     } else {
-        sprintf(command, "%c%c%c%c",-'L', 1, 0, 0);
+        rgbLedState[0] = 0;
+        rgbLedState[1] = 0;
+        rgbLedState[2] = 0;
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 1, 0, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     }
+
 
 #ifdef __WIN32__
     comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
+    comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
-
+    comm->writeData(command, bytesToSend, 12000);
 #endif
 
     return;
@@ -855,22 +919,39 @@ void CommThread::sendUpdateLed2(int state) {
 }
 
 void CommThread::sendUpdateLed3(int state) {
-
+    uint8_t bytesToSend = 0;
     memset(command, 0x0, 20);
 
     if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 3, 1, 0);
+        rgbLedState[3] = rgbLedValue[0];
+        rgbLedState[4] = rgbLedValue[1];
+        rgbLedState[5] = rgbLedValue[2];
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 3, 1, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     } else {
-        sprintf(command, "%c%c%c%c",-'L', 3, 0, 0);
+        rgbLedState[3] = 0;
+        rgbLedState[4] = 0;
+        rgbLedState[5] = 0;
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 3, 0, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     }
 
 #ifdef __WIN32__
     comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
+    comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
-
+    comm->writeData(command, bytesToSend, 12000);
 #endif
 
     return;
@@ -899,22 +980,39 @@ void CommThread::sendUpdateLed4(int state) {
 }
 
 void CommThread::sendUpdateLed5(int state) {
-
+    uint8_t bytesToSend = 0;
     memset(command, 0x0, 20);
 
     if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 5, 1, 0);
+        rgbLedState[6] = rgbLedValue[0];
+        rgbLedState[7] = rgbLedValue[1];
+        rgbLedState[8] = rgbLedValue[2];
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 5, 1, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     } else {
-        sprintf(command, "%c%c%c%c",-'L', 5, 0, 0);
+        rgbLedState[6] = 0;
+        rgbLedState[7] = 0;
+        rgbLedState[8] = 0;
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 5, 0, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     }
 
 #ifdef __WIN32__
     comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
+    comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
-
+    comm->writeData(command, bytesToSend, 12000);
 #endif
 
     return;
@@ -943,22 +1041,39 @@ void CommThread::sendUpdateLed6(int state) {
 }
 
 void CommThread::sendUpdateLed7(int state) {
-
+    uint8_t bytesToSend = 0;
     memset(command, 0x0, 20);
 
     if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 7, 1, 0);
+        rgbLedState[9] = rgbLedValue[0];
+        rgbLedState[10] = rgbLedValue[1];
+        rgbLedState[11] = rgbLedValue[2];
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 7, 1, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     } else {
-        sprintf(command, "%c%c%c%c",-'L', 7, 0, 0);
+        rgbLedState[9] = 0;
+        rgbLedState[10] = 0;
+        rgbLedState[11] = 0;
+        if((int)asercomVer == 1) {
+            bytesToSend = 4;
+            sprintf(command, "%c%c%c%c",-'L', 7, 0, 0);
+        } else {
+            bytesToSend = 13;
+            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
+        }
     }
 
 #ifdef __WIN32__
     comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
+    comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
-
+    comm->writeData(command, bytesToSend, 12000);
 #endif
 
     return;
@@ -1195,3 +1310,29 @@ void CommThread::sound5Slot() {
 void CommThread::audioOffSlot() {
     audioOffNow = true;
 }
+
+void CommThread::updateRed(int value) {
+    rgbLedValue[0] = value;
+    updateLed1Now = true;
+    updateLed3Now = true;
+    updateLed5Now = true;
+    updateLed7Now = true;
+}
+
+void CommThread::updateGreen(int value) {
+    rgbLedValue[1] = value;
+    updateLed1Now = true;
+    updateLed3Now = true;
+    updateLed5Now = true;
+    updateLed7Now = true;
+}
+
+void CommThread::updateBlue(int value) {
+    rgbLedValue[2] = value;
+    updateLed1Now = true;
+    updateLed3Now = true;
+    updateLed5Now = true;
+    updateLed7Now = true;
+}
+
+

@@ -99,7 +99,10 @@ class CommThread : public QThread
         uint16_t getBatteryRaw(){return batteryRaw;}
         char* getBatteryRawStr(){return batteryRawStr;}
         int16_t getGyroRaw(uint8_t axis){return gyroRaw[axis];}
-        uint8_t getAsercomVer(void){return asercomVer;};
+        uint8_t getAsercomVer(void){return asercomVer;}
+        uint16_t getDistanceCm(void){return distanceCm;}
+        char* getDistanceCmStr(void){return distanceCmStr;}
+        uint8_t buttonIsPressed(void){return buttonState==1;}
 
         void sendGoUp(int motorSpeed);					/**< called when the "F" button is clicked; send the command to move forward the robot*/
         void sendGoDown(int motorSpeed);					/**< called when the "B" button is clicked; send the command to move backward the robot*/
@@ -156,6 +159,11 @@ class CommThread : public QThread
         int16_t gyroRaw[3];
         char batteryRawStr[5];
         uint8_t asercomVer;
+        uint16_t distanceCm;
+        char distanceCmStr[5];
+        uint8_t rgbLedValue[3];
+        uint8_t rgbLedState[12];
+        uint8_t buttonState;
 		#ifdef __WIN32__
 			TCommPort *comm;								/**< pointer to the serial port for the bluetooth device (Windows)*/
 		#else
@@ -187,6 +195,9 @@ class CommThread : public QThread
         void sound4Slot();
         void sound5Slot();
         void audioOffSlot();
+        void updateRed(int value);
+        void updateGreen(int value);
+        void updateBlue(int value);
 
     signals:
         void newBinaryData();
