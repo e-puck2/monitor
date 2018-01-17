@@ -103,6 +103,7 @@ class CommThread : public QThread
         uint16_t getDistanceCm(void){return distanceCm;}
         char* getDistanceCmStr(void){return distanceCmStr;}
         uint8_t buttonIsPressed(void){return buttonState==1;}
+		uint8_t getMicroSdState(void){return microSdState;}
 
         void sendGoUp(int motorSpeed);					/**< called when the "F" button is clicked; send the command to move forward the robot*/
         void sendGoDown(int motorSpeed);					/**< called when the "B" button is clicked; send the command to move backward the robot*/
@@ -164,6 +165,7 @@ class CommThread : public QThread
         uint8_t rgbLedValue[3];
         uint8_t rgbLedState[12];
         uint8_t buttonState;
+		uint8_t microSdState;
 		#ifdef __WIN32__
 			TCommPort *comm;								/**< pointer to the serial port for the bluetooth device (Windows)*/
 		#else

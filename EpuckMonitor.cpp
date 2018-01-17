@@ -192,6 +192,16 @@ void EpuckMonitor::binarySensorsUpdate() {
         ui.lblBtnState->setText("released");
         ui.pushButton->setChecked(false);
     }
+	
+	// Micro sd state
+	if(commThread->getMicroSdState()) {
+        ui.lblSdStateColor->setStyleSheet("background-color: rgb(0, 180, 0);");
+        //pLabel->setStyleSheet("QLabel { background-color : red; color : blue; }");
+        ui.lblSdStateTxt->setText("pass");
+	} else {
+        ui.lblSdStateColor->setStyleSheet("background-color: rgb(180, 0, 0);");
+        ui.lblSdStateTxt->setText("fail");
+	}
     return;
 }
 

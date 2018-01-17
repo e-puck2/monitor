@@ -2020,7 +2020,7 @@ QGroupBox::title {
     <property name="title">
      <string>Micro SD</string>
     </property>
-    <widget class="QLabel" name="label_13">
+    <widget class="QLabel" name="lblSdStateTxt">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -2036,7 +2036,7 @@ QGroupBox::title {
       <set>Qt::AlignCenter</set>
      </property>
     </widget>
-    <widget class="QLabel" name="lblSdState">
+    <widget class="QLabel" name="lblSdStateColor">
      <property name="geometry">
       <rect>
        <x>30</x>

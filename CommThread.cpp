@@ -154,7 +154,7 @@ void CommThread::run() {
                 command[5]=-'g';                        // Gyro raw value.
                 command[6]=0;                           //binary command ending
             } else {
-                bytesToSend = 9;
+                bytesToSend = 10;
                 command[0]=-'A';                        //accelerometer request
                 command[1]=-'N';                        //proximity sensors request
                 command[2]=-'O';                        //ambient light request
@@ -163,7 +163,8 @@ void CommThread::run() {
                 command[5]=-'g';                        // Gyro raw value.
                 command[6]=-0x0D;                       // ToF sensor value.
                 command[7]=-0x0B;                       // User button state.
-                command[8]=0;                           //binary command ending
+                command[8]=-0x0E;                       // Micro sd state.
+                command[9]=0;                           //binary command ending
             }
 
             //send all the request in one shot
@@ -453,6 +454,20 @@ void CommThread::run() {
                     std::cerr << msg << std::endl;
                 } else {
                     buttonState = RxBuffer[0];
+                }
+				
+                // Micro sd state.
+                memset(RxBuffer, 0x0, 45);
+            #ifdef __WIN32__
+                bytes=comm->ReadBytes((BYTE*)RxBuffer,1,1000000);
+            #else
+                bytes=comm->readData((char*)RxBuffer,1,1000000);
+            #endif
+                if(bytes<1) {
+                    sprintf(msg, "Micro sd: only %d bytes red", bytes);
+                    std::cerr << msg << std::endl;
+                } else {
+                    microSdState = RxBuffer[0];
                 }
             }
 
