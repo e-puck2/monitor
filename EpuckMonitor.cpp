@@ -182,7 +182,7 @@ void EpuckMonitor::binarySensorsUpdate() {
 
     // ToF data.
     ui.lblDist->setText(commThread->getDistanceCmStr());
-    ui.progressDistance->setValue(commThread->getDistanceCm());
+    ui.progressDistance->setValue((commThread->getDistanceCm()>200)?200:commThread->getDistanceCm());
 
     // Button state
     if(commThread->buttonIsPressed()) {

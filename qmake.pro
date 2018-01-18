@@ -1,12 +1,12 @@
 TEMPLATE	= 	app
 TARGET		=	EPuckMonitor
 DESTDIR		= 	./
-LIBS		+=      -lopengl32
 HEADERS		+= 	EpuckMonitor.h CommThread.h glwidget.h
 SOURCES		+= 	main.cpp EpuckMonitor.cpp CommThread.cpp glwidget.cpp
 win32 {
     SOURCES += comm.cpp
     HEADERS += comm.h
+    LIBS    += -lopengl32
 }
 unix {
     SOURCES += SerialComm.cpp

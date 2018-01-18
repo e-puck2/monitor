@@ -401,7 +401,8 @@ void CommThread::run() {
                 batteryRaw=0;
             } else {
                 batteryRaw = RxBuffer[0]+RxBuffer[1]*256;
-                itoa(batteryRaw, batteryRawStr, 10);
+                memset(batteryRawStr, 0x0, 5);
+                sprintf(batteryRawStr, "%d", batteryRaw);
             }
 
             //GYRO DATA
@@ -439,7 +440,8 @@ void CommThread::run() {
                     distanceCm = 0;
                 } else {
                     distanceCm = (uint16_t)(((uint8_t)RxBuffer[1]<<8)|((uint8_t)RxBuffer[0]))/10;
-                    itoa((distanceCm>200)?200:distanceCm, distanceCmStr, 10);
+                    memset(distanceCmStr, 0x0, 5);
+                    sprintf(distanceCmStr, "%d", (distanceCm>200)?200:distanceCm);
                 }
 
                 // Button state.
