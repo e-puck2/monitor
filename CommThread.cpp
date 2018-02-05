@@ -378,13 +378,13 @@ void CommThread::run() {
                 std::cerr << msg << std::endl;
                 micVolume[0]=micVolume[1]=micVolume[2]=micVolume[3]=0;
             } else {
-                micVolume[0] = (RxBuffer[0]+RxBuffer[1]*256>1500)?1500:RxBuffer[0]+RxBuffer[1]*256;
-                micVolume[1] = (RxBuffer[2]+RxBuffer[3]*256>1500)?1500:RxBuffer[2]+RxBuffer[3]*256;
-                micVolume[2] = (RxBuffer[4]+RxBuffer[5]*256>1500)?1500:RxBuffer[4]+RxBuffer[5]*256;
+                micVolume[0] = ((uint8_t)RxBuffer[0]+(uint8_t)RxBuffer[1]*256>1500)?1500:((uint8_t)RxBuffer[0]+(uint8_t)RxBuffer[1]*256);
+                micVolume[1] = ((uint8_t)RxBuffer[2]+(uint8_t)RxBuffer[3]*256>1500)?1500:((uint8_t)RxBuffer[2]+(uint8_t)RxBuffer[3]*256);
+                micVolume[2] = ((uint8_t)RxBuffer[4]+(uint8_t)RxBuffer[5]*256>1500)?1500:((uint8_t)RxBuffer[4]+(uint8_t)RxBuffer[5]*256);
                 if((int)asercomVer == 1) {
                     micVolume[3] = 0;
                 } else {
-                    micVolume[3] = (RxBuffer[6]+RxBuffer[7]*256>1500)?1500:RxBuffer[6]+RxBuffer[7]*256;
+                    micVolume[3] = ((uint8_t)RxBuffer[6]+(uint8_t)RxBuffer[7]*256>1500)?1500:((uint8_t)RxBuffer[6]+(uint8_t)RxBuffer[7]*256);
                 }
             }
 
@@ -400,7 +400,7 @@ void CommThread::run() {
                 std::cerr << msg << std::endl;
                 batteryRaw=0;
             } else {
-                batteryRaw = RxBuffer[0]+RxBuffer[1]*256;
+                batteryRaw = (uint8_t)RxBuffer[0]+(uint8_t)RxBuffer[1]*256;
                 memset(batteryRawStr, 0x0, 5);
                 sprintf(batteryRawStr, "%d", batteryRaw);
             }
@@ -700,7 +700,7 @@ void CommThread::run() {
 }
 
 void CommThread::getImg(unsigned char *img) {
-    memcpy(img, &imgBuffer[3], 4050);
+    memcpy(img, &imgBuffer[3], IMAGE_BUFF_SIZE-3);
 }
 
 void CommThread::updateParameters(int t, int w, int h, int z) {

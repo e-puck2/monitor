@@ -49,6 +49,8 @@
 #include <iostream>
 #include <stdio.h>
 
+#define IMAGE_BUFF_SIZE (4056+3)
+
 class CommThread : public QThread
 {
     Q_OBJECT
@@ -141,9 +143,9 @@ class CommThread : public QThread
         uint16_t micVolume[4];								/**< microphone data*/
         char selectorStr[3];								/**< selector data*/
         char irCheckStr[8], irAddressStr[8], irDataStr[8];	/**< IR data*/
-        char RxBuffer[45];          //I will receive at most 16 bytes from the sensors
+        char RxBuffer[45];
         char command[20];
-        unsigned char imgBuffer[4050];				/**< image data; 4050 is the maximum number of bytes that can be received at one time from the robot.*/
+        unsigned char imgBuffer[IMAGE_BUFF_SIZE];				/**< image data; IMAGE_BUFF_SIZE is the maximum number of bytes that can be received at one time from the robot.*/
         unsigned int type;						/**< type of the image: color (value 1) or grayscale (value 0)*/
         unsigned int width;						/**< width of the image to be received*/
         unsigned int height;					/**< height of the image to be received*/

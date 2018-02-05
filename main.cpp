@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
     QObject::connect(main.ui.slideRed, SIGNAL(valueChanged(int)), commThread, SLOT(updateRed(int)));
     QObject::connect(main.ui.slideGreen, SIGNAL(valueChanged(int)), commThread, SLOT(updateGreen(int)));
     QObject::connect(main.ui.slideBlue, SIGNAL(valueChanged(int)), commThread, SLOT(updateBlue(int)));
+    QObject::connect(main.ui.btnTest, SIGNAL(clicked()), &main, SLOT(test()));
 
     app.connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
 

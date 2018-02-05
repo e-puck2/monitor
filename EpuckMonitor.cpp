@@ -39,6 +39,7 @@ EpuckMonitor::EpuckMonitor(QMainWindow *parent) : QMainWindow(parent)
     zoom = 8;
     commThread=NULL;
     isReceiving = false;
+    testState = TEST_STOPPED;
 
     //disable all the graphical objects before the connection is established
     ui.chkSensors->setEnabled(false);
@@ -54,6 +55,7 @@ EpuckMonitor::EpuckMonitor(QMainWindow *parent) : QMainWindow(parent)
     ui.btn3->setEnabled(false);
     ui.btn4->setEnabled(false);
     ui.btn5->setEnabled(false);
+    ui.btnAudioOff->setEnabled(false);
     ui.checkLed0->setEnabled(false);
     ui.checkLed1->setEnabled(false);
     ui.checkLed2->setEnabled(false);
@@ -77,6 +79,8 @@ EpuckMonitor::EpuckMonitor(QMainWindow *parent) : QMainWindow(parent)
     QObject::connect(this, SIGNAL(new_y_angle(int)), glWidget, SLOT(setYRotation(int)));
     QObject::connect(this, SIGNAL(new_z_angle(int)), glWidget, SLOT(setZRotation(int)));
 
+    testTimer = new QTimer(this);
+    QObject::connect(testTimer, SIGNAL(timeout()), this, SLOT(updateRgbLeds()));
 }
 
 EpuckMonitor::~EpuckMonitor()
@@ -167,11 +171,22 @@ void EpuckMonitor::binarySensorsUpdate() {
     sprintf(backgroundColor, "background-color: rgb(%d, %d, %d);", 255-int((double)commThread->getLight()/4000.0*255.0), 255-int((double)commThread->getLight()/4000.0*255.0), 255-int((double)commThread->getLight()/4000.0*255.0));
     ui.lblLight->setStyleSheet(backgroundColor);
     //microphone data
+    char str[5];
     ui.progressMic0->setValue(commThread->getMic(0));
+    sprintf(str, "%4d", commThread->getMic(0));
+    ui.lblMic0Val->setText(str);
     ui.progressMic1->setValue(commThread->getMic(1));
+    memset(str, 0x0, 5);
+    sprintf(str, "%4d", commThread->getMic(1));
+    ui.lblMic1Val->setText(str);
     ui.progressMic2->setValue(commThread->getMic(2));
+    memset(str, 0x0, 5);
+    sprintf(str, "%4d", commThread->getMic(2));
+    ui.lblMic2Val->setText(str);
     ui.progressMic3->setValue(commThread->getMic(3));
-
+    memset(str, 0x0, 5);
+    sprintf(str, "%4d", commThread->getMic(3));
+    ui.lblMic3Val->setText(str);
     // Battery data.
     ui.lblBattAdc->setText(commThread->getBatteryRawStr());
 
@@ -225,7 +240,7 @@ void EpuckMonitor::updateParameters() {
     zoom = ui.txtZoom->text().toInt();
 
     if(ui.radioColor->isChecked()) {
-        if((width*height)>2025) {	//at most 2025 pixels allowed
+        if((width*height)>(IMAGE_BUFF_SIZE-3)/2) {	//at most 2028 pixels allowed
             printMessage("Height and Width not allowed, at most 2025 pixels!");
             return;
         } else {
@@ -233,8 +248,8 @@ void EpuckMonitor::updateParameters() {
         }
     }
     else if(ui.radioGrayscale->isChecked()) {
-        if((width*height)>2025) {
-            printMessage("Height and Width not allowed, at most 2025 pixels!");
+        if((width*height)>(IMAGE_BUFF_SIZE-3)/2) {
+            printMessage("Height and Width not allowed, at most 2028 pixels!");
             return;
         } else {
             type = 0;
@@ -303,7 +318,10 @@ void EpuckMonitor::goRight() {
 }
 
 void EpuckMonitor::updateSpeed() {
+    char str[5];
     motorSpeed = ui.sliderVel->value();
+    sprintf(str, "%4d", motorSpeed);
+    ui.lblVelValue->setText(str);
 }
 
 void EpuckMonitor::disconnect() {
@@ -329,6 +347,7 @@ void EpuckMonitor::disconnect() {
     ui.btn3->setEnabled(false);
     ui.btn4->setEnabled(false);
     ui.btn5->setEnabled(false);
+    ui.btnAudioOff->setEnabled(false);
     ui.checkLed0->setEnabled(false);
     ui.checkLed1->setEnabled(false);
     ui.checkLed2->setEnabled(false);
@@ -346,6 +365,7 @@ void EpuckMonitor::disconnect() {
     ui.radioColor->setEnabled(false);
     ui.radioGrayscale->setEnabled(false);
     ui.btnImage->setText("Start receiving images");
+    ui.btnTest->setEnabled(false);
 
     return;
 }
@@ -405,6 +425,7 @@ void EpuckMonitor::portOpened() {
     ui.btn3->setEnabled(true);
     ui.btn4->setEnabled(true);
     ui.btn5->setEnabled(true);
+    ui.btnAudioOff->setEnabled(true);
     ui.checkLed0->setEnabled(true);
     ui.checkLed1->setEnabled(true);
     ui.checkLed2->setEnabled(true);
@@ -421,6 +442,80 @@ void EpuckMonitor::portOpened() {
     ui.txtZoom->setEnabled(true);
     ui.radioColor->setEnabled(true);
     ui.radioGrayscale->setEnabled(true);
+    ui.btnTest->setEnabled(true);
 }
 
+void EpuckMonitor::test() {
+    if(testState == TEST_STOPPED) {
+        testState = TEST_STARTED;
+        ui.btnTest->setText("Stop test");
 
+        // Turn on all leds.
+        ui.checkLed0->setChecked(false);
+        ui.checkLed0->setChecked(true);
+        ui.checkLed1->setChecked(false);
+        ui.checkLed1->setChecked(true);
+        ui.checkLed2->setChecked(false);
+        ui.checkLed2->setChecked(true);
+        ui.checkLed3->setChecked(false);
+        ui.checkLed3->setChecked(true);
+        ui.checkLed4->setChecked(false);
+        ui.checkLed4->setChecked(true);
+        ui.checkLed5->setChecked(false);
+        ui.checkLed5->setChecked(true);
+        ui.checkLed6->setChecked(false);
+        ui.checkLed6->setChecked(true);
+        ui.checkLed7->setChecked(false);
+        ui.checkLed7->setChecked(true);
+        ui.checkLed8->setChecked(false);
+        ui.checkLed8->setChecked(true);
+        ui.checkLed9->setChecked(false);
+        ui.checkLed9->setChecked(true);
+        ui.slideRed->setValue(100);
+        ui.slideGreen->setValue(0);
+        ui.slideBlue->setValue(0);
+        rgbState = 1;
+
+        // Turn on sound.
+        ui.btn3->click();
+
+        // Turn on motors.
+        ui.sliderVel->setValue(150);
+        ui.btnUp->click();
+
+        testTimer->start(1000);
+    } else {
+        testState = TEST_STOPPED;
+        ui.btnTest->setText("Start test");
+
+        // Turn off motors.
+        ui.btnStop->click();
+
+        testTimer->stop();
+    }
+
+    return;
+}
+
+void EpuckMonitor::updateRgbLeds() {
+    switch(rgbState) {
+        case 0:
+            ui.slideRed->setValue(100);
+            ui.slideGreen->setValue(0);
+            ui.slideBlue->setValue(0);
+            rgbState = 1;
+            break;
+        case 1:
+            ui.slideRed->setValue(0);
+            ui.slideGreen->setValue(100);
+            ui.slideBlue->setValue(0);
+            rgbState = 2;
+            break;
+        case 2:
+            ui.slideRed->setValue(0);
+            ui.slideGreen->setValue(0);
+            ui.slideBlue->setValue(100);
+            rgbState = 0;
+            break;
+    }
+}

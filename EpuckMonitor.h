@@ -42,6 +42,10 @@
 #include "glwidget.h"
 #include <stdio.h>
 #include <QtMath>
+#include <QTimer>
+
+#define TEST_STOPPED 0
+#define TEST_STARTED 1
 
 class EpuckMonitor : public QMainWindow
 {
@@ -65,10 +69,13 @@ class EpuckMonitor : public QMainWindow
         unsigned int zoom;
         char command[20];
         char response[3];
-        unsigned char imgBuffer[4050];
+        unsigned char imgBuffer[IMAGE_BUFF_SIZE];
         bool isReceiving;
         GLWidget *glWidget;
         char backgroundColor[100];
+        uint8_t rgbState;
+        uint8_t testState;
+        QTimer *testTimer;
 
     public slots:
         void connect();					/**< called when the "Connect" button is clicked; initialize the connection and the threads*/
@@ -86,6 +93,8 @@ class EpuckMonitor : public QMainWindow
         void getImages();				/**< called when the "Get Image" button is clicked; start the "cameraThread" in order to receive an image from the robot*/
         void printMessage(QString s);
         void portOpened();
+        void test();
+        void updateRgbLeds();
 
     signals:
         void newParameters(int t, int w, int h, int z);
