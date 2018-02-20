@@ -46,6 +46,9 @@ void CommThread::initConnection(char* portName) {
     char version[100];
     int err = 0;
 
+    memset(this->portName, 0x0, 50);
+    memcpy(this->portName, portName, strlen(portName));
+
 #ifdef __WIN32__
 
     comm = new TCommPort();
@@ -58,6 +61,7 @@ void CommThread::initConnection(char* portName) {
     if(err==-1) {
         std::cerr << "Unable to open serial port." << std::endl;
         emit cannotOpenPort("Unable to open serial port.");
+        emit portClosed();
         return;
     }
     emit portOpened();
@@ -77,28 +81,54 @@ void CommThread::initConnection(char* portName) {
     comm = new SerialComm();
     err = comm->connect(portName);
     if(err==-1) {
-        std::cerr << "Unable to open serial port." << std::endl;
+        std::cerr << "Unable to open serial port " << portName << std::endl;
         emit cannotOpenPort("Unable to open serial port.");
+        emit portClosed();
         return;
     }
-    emit portOpened();
+
+    usleep(10000);
+    comm->flush();
+    while(comm->readData(version, 100, 200000)>0) {
+        std::cerr << version << std::endl;
+        memset(version, 0, 100);
+        usleep(10000);
+    }
 
     memset(command, 0x0, 20);
     sprintf(command, "\r");
-    comm->writeData(command, 1, 6000);        // clear output buffer
-    comm->readData(version, 100, 90000);
-    std::cerr << "version = " << version << std::endl;
+    comm->writeData(command, 1, 10000);        // clear output buffer
+    usleep(10000);
+    comm->readData(version, 100, 200000);
+
+    comm->flush();
+    while(comm->readData(version, 100, 200000)>0) {
+        std::cerr << version << std::endl;
+        memset(version, 0, 100);
+        usleep(10000);
+    }
 
     sprintf(command, "V\r");
-    comm->writeData(command, 2, 2000);
+    comm->writeData(command, 2, 10000);
+    usleep(10000);
     memset(version, 0x0, 100);
     comm->readData(version, 100, 200000);
+    std::cerr << "version = " << version << std::endl;
     emit showVersion(&version[2], 0);
 
 #endif
 
     asercomVer = version[10]-'0';
     std::cerr << "asercom version = " << (int)asercomVer << std::endl;
+
+    if(asercomVer!=1 && asercomVer!=2) {
+        std::cerr << "Unable to work with this protocol version" << std::endl;
+        closeCommunication();
+        emit reconnect();
+        return;
+    }
+
+    emit portOpened();
 
 /*
     //initialize camera parameters
@@ -128,6 +158,23 @@ CommThread::~CommThread() {
 
 }
 
+void CommThread::closeCommunication() {
+#ifdef __WIN32__
+    if(comm!=NULL) {
+        comm->FlushCommPort();
+        comm->PurgeCommPort();
+        comm->CloseCommPort();
+        comm=NULL;
+    }
+#else
+    if(comm!=NULL) {
+        comm->disconnect();
+        comm=NULL;
+    }
+#endif
+    emit portClosed();
+}
+
 void CommThread::run() {
 
     char msg[50];
@@ -137,10 +184,13 @@ void CommThread::run() {
     float flt=0;
     uint8_t bytesToRead = 0;
     uint8_t bytesToSend = 0;
+    bool reconnectFlag = false;
 
     abortThread = false;
 
     while(!abortThread) {
+
+        msleep(20); // Keep main thread (GUI) responsive.
 
         if(getSensorsData) {
 
@@ -174,6 +224,7 @@ void CommThread::run() {
             comm->FlushCommPort();
             Sleep(100);
         #else
+            comm->flush();
             bytes=comm->writeData(command, bytesToSend, 1000000);
         #endif
 
@@ -214,7 +265,10 @@ void CommThread::run() {
             mantis=0;
             exp=0;
             flt=0;
-            if(bytes<4) {	//data not received completely
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<4) {	//data not received completely
                 sprintf(msg, "Acceleration: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 acceleration=0.0;
@@ -235,7 +289,10 @@ void CommThread::run() {
         #else
             bytes=comm->readData((char*)RxBuffer,4,1000000);
         #endif
-            if(bytes<4) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<4) {
                 sprintf(msg, "Orientation: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 orientation=0.0;
@@ -261,7 +318,10 @@ void CommThread::run() {
         #else
             bytes=comm->readData((char*)RxBuffer,4,1000000);
         #endif
-            if(bytes<4) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<4) {
                 sprintf(msg, "Inclination: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 inclination=0.0;
@@ -287,7 +347,10 @@ void CommThread::run() {
         #else
             bytes=comm->readData((char*)RxBuffer,16,1000000);
         #endif
-            if(bytes<16) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<16) {
                 sprintf(msg, "IRs: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 ir0=0;
@@ -341,7 +404,10 @@ void CommThread::run() {
         #else
             bytes=comm->readData((char*)RxBuffer,16,1000000);
         #endif
-            if(bytes<16) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<16) {
                 sprintf(msg, "Light: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 lightAvg=0;
@@ -373,7 +439,10 @@ void CommThread::run() {
         #else
             bytes=comm->readData((char*)RxBuffer,bytesToRead,1000000);
         #endif
-            if(bytes<bytesToRead) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<bytesToRead) {
                 sprintf(msg, "MICs: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 micVolume[0]=micVolume[1]=micVolume[2]=micVolume[3]=0;
@@ -395,10 +464,15 @@ void CommThread::run() {
         #else
             bytes=comm->readData((char*)RxBuffer,2,1000000);
         #endif
-            if(bytes<2) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<2) {
                 sprintf(msg, "Battery: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 batteryRaw=0;
+                memset(batteryRawStr, 0x0, 5);
+                sprintf(batteryRawStr, "%d", 0);
             } else {
                 batteryRaw = (uint8_t)RxBuffer[0]+(uint8_t)RxBuffer[1]*256;
                 memset(batteryRawStr, 0x0, 5);
@@ -412,7 +486,10 @@ void CommThread::run() {
         #else
             bytes=comm->readData((char*)RxBuffer,6,1000000);
         #endif
-            if(bytes<6) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<6) {
                 sprintf(msg, "Gyro: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                 gyroRaw[0]=0;
@@ -434,10 +511,15 @@ void CommThread::run() {
             #else
                 bytes=comm->readData((char*)RxBuffer,2,1000000);
             #endif
-                if(bytes<2) {
+                if(bytes == 0) {
+                    reconnectFlag = true;
+                    break;
+                } else if(bytes<2) {
                     sprintf(msg, "ToF: only %d bytes red", bytes);
                     std::cerr << msg << std::endl;
                     distanceCm = 0;
+                    memset(distanceCmStr, 0x0, 5);
+                    sprintf(distanceCmStr, "%d", 0);
                 } else {
                     distanceCm = (uint16_t)(((uint8_t)RxBuffer[1]<<8)|((uint8_t)RxBuffer[0]))/10;
                     memset(distanceCmStr, 0x0, 5);
@@ -451,7 +533,10 @@ void CommThread::run() {
             #else
                 bytes=comm->readData((char*)RxBuffer,1,1000000);
             #endif
-                if(bytes<1) {
+                if(bytes == 0) {
+                    reconnectFlag = true;
+                    break;
+                } else if(bytes<1) {
                     sprintf(msg, "Button: only %d bytes red", bytes);
                     std::cerr << msg << std::endl;
                 } else {
@@ -465,7 +550,10 @@ void CommThread::run() {
             #else
                 bytes=comm->readData((char*)RxBuffer,1,1000000);
             #endif
-                if(bytes<1) {
+                if(bytes == 0) {
+                    reconnectFlag = true;
+                    break;
+                } else if(bytes<1) {
                     sprintf(msg, "Micro sd: only %d bytes red", bytes);
                     std::cerr << msg << std::endl;
                 } else {
@@ -485,17 +573,22 @@ void CommThread::run() {
                     Sleep(100);
                     bytes = comm->ReadBytes((BYTE*)RxBuffer,5,1000000);
             #else
+                    comm->flush();
                     comm->writeData("C\r",2,1000000);
                     bytes = comm->readData((char*)RxBuffer, 5, 1000000);
             #endif
-            if(bytes<5) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<5) {
                 sprintf(msg, "Selector: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                     //comm->discard(5-bytes);
+            } else {
+                memset(selectorStr, 0x0, 3);
+                sscanf((char*)RxBuffer,"c,%d\r\n",&selector);
+                sprintf(selectorStr, "%d", selector);
             }
-            memset(selectorStr, 0x0, 3);
-            sscanf((char*)RxBuffer,"c,%d\r\n",&selector);
-            sprintf(selectorStr, "%d", selector);
 
             //IR DATA (ascii mode)
             memset(RxBuffer, 0x0, 45);
@@ -507,21 +600,26 @@ void CommThread::run() {
                     Sleep(100);
                     bytes = comm->ReadBytes((BYTE*)RxBuffer,45,1000000);
             #else
+                    comm->flush();
                     comm->writeData("G\r",2,1000000);
                     bytes = comm->readData((char*)RxBuffer, 45, 10000000);
             #endif
-            if(bytes<45) {
+            if(bytes == 0) {
+                reconnectFlag = true;
+                break;
+            } else if(bytes<45) {
                 sprintf(msg, "IRs data: only %d bytes red", bytes);
                 std::cerr << msg << std::endl;
                     //comm->discard(45-bytes);
+            } else {
+                memset(irCheckStr, 0x0, 8);
+                memset(irAddressStr, 0x0, 8);
+                memset(irDataStr, 0x0, 8);
+                sscanf((char*)RxBuffer,"g IR check : 0x%x, address : 0x%x, data : 0x%x\r\n",&ir_check,&ir_address,&ir_data);
+                sprintf(irCheckStr, "%x", ir_check);
+                sprintf(irAddressStr, "%x", ir_address);
+                sprintf(irDataStr, "%x", ir_data);
             }
-            memset(irCheckStr, 0x0, 8);
-            memset(irAddressStr, 0x0, 8);
-            memset(irDataStr, 0x0, 8);
-            sscanf((char*)RxBuffer,"g IR check : 0x%x, address : 0x%x, data : 0x%x\r\n",&ir_check,&ir_address,&ir_data);
-            sprintf(irCheckStr, "%x", ir_check);
-            sprintf(irAddressStr, "%x", ir_address);
-            sprintf(irDataStr, "%x", ir_data);
 
             emit newAsciiData();
 
@@ -543,6 +641,7 @@ void CommThread::run() {
             comm->FlushCommPort();
             Sleep(100);
         #else
+            comm->flush();
             bytes = comm->writeData(command,2,6000);
         #endif
 
@@ -683,19 +782,11 @@ void CommThread::run() {
 
     }   // end infinite loop
 
-    #ifdef __WIN32__
-        if(comm!=NULL) {
-            comm->FlushCommPort();
-            comm->PurgeCommPort();
-            comm->CloseCommPort();
-            comm=NULL;
-        }
-    #else
-        if(comm!=NULL) {
-            comm->disconnect();
-            comm=NULL;
-        }
-    #endif
+    closeCommunication();
+    msleep(300);
+    if(reconnectFlag) {
+        emit reconnect();
+    }
 
 }
 

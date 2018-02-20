@@ -80,12 +80,12 @@ void SerialComm::flush() {
 	tcflush(fd,TCIOFLUSH);
 }
 
-int SerialComm::writeData(char *buf, int num_bytes, int usleep_time) {
+int SerialComm::writeData(char *buf, int num_bytes, uint32_t usleep_time) {
 	tcflush(fd,TCIOFLUSH);				//flush the input and output buffers before writing new data/commands
 	int bytes_written=0;
 	int current_bytes_written=0;
 	errno=0;
-	int timeout = usleep_time/70;		//wait 70 useconds between every read; the loop lasts for usleep_time/70 times
+    uint32_t timeout = usleep_time/70;		//wait 70 useconds between every read; the loop lasts for usleep_time/70 times
 	while(bytes_written<num_bytes) {
 		current_bytes_written=write(fd, &buf[bytes_written], num_bytes-bytes_written);
 		if(current_bytes_written>=0) {	//if write ok
@@ -107,11 +107,11 @@ int SerialComm::writeData(char *buf, int num_bytes, int usleep_time) {
 	return bytes_written;
 }
 
-int SerialComm::readData(char *buf, int num_bytes, int usleep_time) {
+int SerialComm::readData(char *buf, int num_bytes, uint32_t usleep_time) {
 	int bytes_red=0;
 	int current_bytes_red=0;
 	errno=0;
-	int timeout = usleep_time/70;		//wait 70 useconds between every read; the loop lasts for usleep_time/70 times
+    uint32_t timeout = usleep_time/70;		//wait 70 useconds between every read; the loop lasts for usleep_time/70 times
 	while(bytes_red<num_bytes) {
 		current_bytes_red=read(fd,&buf[bytes_red],num_bytes-bytes_red);
 		if(current_bytes_red>=0) {	//if read ok

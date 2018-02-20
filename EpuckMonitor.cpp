@@ -73,6 +73,8 @@ EpuckMonitor::EpuckMonitor(QMainWindow *parent) : QMainWindow(parent)
     ui.radioColor->setEnabled(false);
     ui.radioGrayscale->setEnabled(false);
 
+    ui.txtPort->setFocus();
+
     glWidget = new GLWidget;
     ui.layoutOpenGL->addWidget(glWidget);
     QObject::connect(this, SIGNAL(new_x_angle(int)), glWidget, SLOT(setXRotation(int)));
@@ -90,6 +92,7 @@ EpuckMonitor::~EpuckMonitor()
 }
 
 void EpuckMonitor::connect() {
+    ui.btnConnect->setEnabled(false);
     emit connectToRobot(ui.txtPort->text().toLatin1().data());
     return;
 }
@@ -166,10 +169,12 @@ void EpuckMonitor::binarySensorsUpdate() {
     ui.progressIR5->setValue(commThread->getIr5());
     ui.progressIR6->setValue(commThread->getIr6());
     ui.progressIR7->setValue(commThread->getIr7());
+
     //light sensor data
     memset(backgroundColor, 0x0, 100);
     sprintf(backgroundColor, "background-color: rgb(%d, %d, %d);", 255-int((double)commThread->getLight()/4000.0*255.0), 255-int((double)commThread->getLight()/4000.0*255.0), 255-int((double)commThread->getLight()/4000.0*255.0));
     ui.lblLight->setStyleSheet(backgroundColor);
+
     //microphone data
     char str[5];
     ui.progressMic0->setValue(commThread->getMic(0));
@@ -187,6 +192,7 @@ void EpuckMonitor::binarySensorsUpdate() {
     memset(str, 0x0, 5);
     sprintf(str, "%4d", commThread->getMic(3));
     ui.lblMic3Val->setText(str);
+
     // Battery data.
     ui.lblBattAdc->setText(commThread->getBatteryRawStr());
 
@@ -207,7 +213,7 @@ void EpuckMonitor::binarySensorsUpdate() {
         ui.lblBtnState->setText("released");
         ui.pushButton->setChecked(false);
     }
-	
+
 	// Micro sd state
 	if(commThread->getMicroSdState()) {
         ui.lblSdStateColor->setStyleSheet("background-color: rgb(0, 180, 0);");
@@ -217,6 +223,7 @@ void EpuckMonitor::binarySensorsUpdate() {
         ui.lblSdStateColor->setStyleSheet("background-color: rgb(180, 0, 0);");
         ui.lblSdStateTxt->setText("fail");
 	}
+
     return;
 }
 
@@ -519,3 +526,4 @@ void EpuckMonitor::updateRgbLeds() {
             break;
     }
 }
+

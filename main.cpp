@@ -40,6 +40,7 @@ int main(int argc, char *argv[]) {
     main.show();
     QObject::connect(main.ui.btnConnect, SIGNAL(clicked()), &main, SLOT(connect()));
     QObject::connect(main.ui.btnDisconnect, SIGNAL(clicked()), &main, SLOT(disconnect()));
+    QObject::connect(commThread, SIGNAL(reconnect()), &main, SLOT(connect()));
     QObject::connect(main.ui.btnParameters, SIGNAL(clicked()), &main, SLOT(updateParameters()));
     QObject::connect(&main, SIGNAL(newParameters(int,int,int,int)), commThread, SLOT(updateParameters(int,int,int,int)));
     QObject::connect(main.ui.btnUp, SIGNAL(clicked()), &main, SLOT(goUp()));
@@ -72,6 +73,7 @@ int main(int argc, char *argv[]) {
     QObject::connect(&main, SIGNAL(connectToRobot(char*)), commThread, SLOT(initConnection(char*)));
     QObject::connect(main.ui.btnImage, SIGNAL(clicked()), &main, SLOT(getImages()));
     QObject::connect(commThread, SIGNAL(cannotOpenPort(QString)), &main, SLOT(printMessage(QString)));
+    QObject::connect(commThread, SIGNAL(portClosed()), &main, SLOT(disconnect()));
     QObject::connect(commThread, SIGNAL(portOpened()), &main, SLOT(portOpened()));
     QObject::connect(commThread, SIGNAL(showVersion(QString,int)), main.ui.statusbar, SLOT(showMessage(QString,int)));
     QObject::connect(main.ui.slideRed, SIGNAL(valueChanged(int)), commThread, SLOT(updateRed(int)));

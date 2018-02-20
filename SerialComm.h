@@ -70,7 +70,7 @@ class SerialComm {
 			@param	usleep_time	specifies the total waiting time before exiting the writing operation in case of errors; the value is specified in microseconds unit.
 			@return				returns the number of bytes correctly written to the serial port.
 		*/		
-		int writeData(char *buf, int num_bytes, int usleep_time);
+        int writeData(char *buf, int num_bytes, uint32_t usleep_time);
 
 		/**
 			This function is used to receive data from the device.
@@ -79,7 +79,7 @@ class SerialComm {
 			@param	usleep_time	specifies the total waiting time before exiting the reading operation in case of errors; the value is specified in microseconds unit.
 			@return				returns the number of bytes correctly red from the device.
 		*/
-		int readData(char *buf, int num_bytes, int usleep_time);
+        int readData(char *buf, int num_bytes, uint32_t usleep_time);
 		
 		/**
 			This function flushes both the input and output buffers.

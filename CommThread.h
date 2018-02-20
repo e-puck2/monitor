@@ -67,6 +67,7 @@ class CommThread : public QThread
 			void setComm(SerialComm *sc){comm=sc;}
         #endif
         void init();
+        void closeCommunication();
         float getAcceleration(){return acceleration;}
         float getOrientation(){return orientation;}
         float getInclination(){return inclination;}
@@ -168,6 +169,7 @@ class CommThread : public QThread
         uint8_t rgbLedState[12];
         uint8_t buttonState;
 		uint8_t microSdState;
+        char portName[50];
 		#ifdef __WIN32__
 			TCommPort *comm;								/**< pointer to the serial port for the bluetooth device (Windows)*/
 		#else
@@ -210,6 +212,8 @@ class CommThread : public QThread
         void cannotOpenPort(QString s);
         void portOpened();
         void showVersion(QString, int);
+        void reconnect();
+        void portClosed();
 
 };
 
