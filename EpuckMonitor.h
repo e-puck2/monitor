@@ -47,6 +47,9 @@
 #define TEST_STOPPED 0
 #define TEST_STARTED 1
 
+#define UI_STATE_ROBOT_DISCONNECTED 0
+#define UI_STATE_ROBOT_CONNECTED 1
+
 class EpuckMonitor : public QMainWindow
 {
     Q_OBJECT
@@ -55,21 +58,26 @@ class EpuckMonitor : public QMainWindow
         EpuckMonitor(QMainWindow *parent=0);
         ~EpuckMonitor();
         void setCommThread(CommThread *thread);
+        void disableUi();
+
+
 
         Ui::MainWindow ui;
+        unsigned char imgBuffer[MAX_BUFF_SIZE];
+        QImage img;
+        QLabel *lblCamera;
+
+
         int motorSpeed;					/**< used to store the value of the velocity changed with the slider*/
         CommThread *commThread;
         bool imgReceived;				/**< indicate whether or not the image was received completely*/
-        QImage img;
-        QLabel *lblCamera;
         unsigned int type;						/**< type of the image: color (value 1) or grayscale (value 0)*/
         unsigned int width;						/**< width of the image to be received*/
         unsigned int height;					/**< height of the image to be received*/
         unsigned int pixNum;					/**< total number of pixels (bytes) to be received; in case of grayscale image it is width*height, in case of color image it is width*height*2 (RGB565)*/
         unsigned int zoom;
         char command[20];
-        char response[3];
-        unsigned char imgBuffer[IMAGE_BUFF_SIZE];
+        char response[3];        
         bool isReceiving;
         GLWidget *glWidget;
         char backgroundColor[100];
@@ -78,13 +86,13 @@ class EpuckMonitor : public QMainWindow
         QTimer *testTimer;
 
     public slots:
+        void updateUiState(uint8_t state);
+        void updateFps();
+
+
         void connect();					/**< called when the "Connect" button is clicked; initialize the connection and the threads*/
         void disconnect();				/**< called when the "Disconnect" button is clicked; stop the connection and the threads if they are running*/
         void updateParameters();		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/
-        void goUp();					/**< called when the "F" button is clicked; send the command to move forward the robot*/
-        void goDown();					/**< called when the "B" button is clicked; send the command to move backward the robot*/
-        void goLeft();					/**< called when the "L" button is clicked; send the command to turn left the robot*/
-        void goRight();					/**< called when the "R" button is clicked; send the command to turn right the robot*/
         void sensorActivation(int state);		/**< called when the "Activate Sensors" checkbox is checked/unchecked; activate/deactivate the threads for receiveing data from the sensors*/
         void updateSpeed();				/**< called when the slider changes its state; update the "motorSpeed" variable accordingly*/
         void binarySensorsUpdate();		/**< called when the "binaraySensorThread" terminates; update the graphical objects accordingly to the received data*/
@@ -92,17 +100,11 @@ class EpuckMonitor : public QMainWindow
         void cameraUpdate();			/**< called when the "cameraThread" terminates; update the image accordingly to the received data*/
         void getImages();				/**< called when the "Get Image" button is clicked; start the "cameraThread" in order to receive an image from the robot*/
         void printMessage(QString s);
-        void portOpened();
         void test();
         void updateRgbLeds();
 
     signals:
         void newParameters(int t, int w, int h, int z);
-        void moveForward(int motorSpeed);
-        void moveBackward(int motorSpeed);
-        void moveLeft(int motorSpeed);
-        void moveRight(int motorSpeed);
-        void connectToRobot(char* portName);
         void new_x_angle(int value);
         void new_y_angle(int value);
         void new_z_angle(int value);

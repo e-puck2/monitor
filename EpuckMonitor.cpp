@@ -41,7 +41,28 @@ EpuckMonitor::EpuckMonitor(QMainWindow *parent) : QMainWindow(parent)
     isReceiving = false;
     testState = TEST_STOPPED;
 
-    //disable all the graphical objects before the connection is established
+    disableUi();
+    ui.txtPort->setFocus();
+
+    glWidget = new GLWidget;
+    ui.layoutOpenGL->addWidget(glWidget);
+    QObject::connect(this, SIGNAL(new_x_angle(int)), glWidget, SLOT(setXRotation(int)));
+    QObject::connect(this, SIGNAL(new_y_angle(int)), glWidget, SLOT(setYRotation(int)));
+    QObject::connect(this, SIGNAL(new_z_angle(int)), glWidget, SLOT(setZRotation(int)));
+
+    testTimer = new QTimer(this);
+    QObject::connect(testTimer, SIGNAL(timeout()), this, SLOT(updateRgbLeds()));
+}
+
+EpuckMonitor::~EpuckMonitor()
+{
+    disconnect();
+    return;
+}
+
+void EpuckMonitor::disableUi() {
+    ui.btnConnect->setEnabled(true);
+    ui.btnDisconnect->setEnabled(false);
     ui.chkSensors->setEnabled(false);
     ui.btnParameters->setEnabled(false);
     ui.btnImage->setEnabled(false);
@@ -72,34 +93,49 @@ EpuckMonitor::EpuckMonitor(QMainWindow *parent) : QMainWindow(parent)
     ui.txtZoom->setEnabled(false);
     ui.radioColor->setEnabled(false);
     ui.radioGrayscale->setEnabled(false);
-
-    ui.txtPort->setFocus();
-
-    glWidget = new GLWidget;
-    ui.layoutOpenGL->addWidget(glWidget);
-    QObject::connect(this, SIGNAL(new_x_angle(int)), glWidget, SLOT(setXRotation(int)));
-    QObject::connect(this, SIGNAL(new_y_angle(int)), glWidget, SLOT(setYRotation(int)));
-    QObject::connect(this, SIGNAL(new_z_angle(int)), glWidget, SLOT(setZRotation(int)));
-
-    testTimer = new QTimer(this);
-    QObject::connect(testTimer, SIGNAL(timeout()), this, SLOT(updateRgbLeds()));
-}
-
-EpuckMonitor::~EpuckMonitor()
-{
-    disconnect();
-    return;
+    ui.btnImage->setText("Start receiving images");
+    ui.btnTest->setEnabled(false);
 }
 
 void EpuckMonitor::connect() {
-    ui.btnConnect->setEnabled(false);
-    emit connectToRobot(ui.txtPort->text().toLatin1().data());
+    commThread->enableSensors(true);
+    commThread->enableCamera(false);
+    commThread->initConnection(ui.txtPort->text());
     return;
 }
 
+void EpuckMonitor::disconnect() {
+    commThread->enableSensors(false);
+    commThread->enableCamera(false);
+    commThread->closeCommunication();
+    return;
+}
 
 void EpuckMonitor::cameraUpdate() {
 
+    commThread->getImg(imgBuffer);
+
+    img = QImage(160, 120, QImage::Format_RGB32);
+    int i=0;
+    for(int y=0; y<120; y++) {
+        for(int x=0; x<160; x++) {
+            //qDebug() << input_buffer[i];
+            //qDebug() << input_buffer[i+1];
+            int r = (int)(imgBuffer[i]&0xF8);
+            int g = (int)((imgBuffer[i]&0x07)<<5 | (imgBuffer[i+1]&0xE0)>>3);
+            int b = (int)(imgBuffer[i+1]&0x1F)<<3;
+            img.setPixel(x, y, qRgb (r, g, b));
+            i+=2;
+        }
+    }
+    //the size of the label is 200*200, the maximum size of the image is 45*45
+    //lblCamera->setFixedSize(width*200/45, height*200/45);
+    lblCamera->setFixedSize(160, 120);
+    lblCamera->setScaledContents(true);
+    lblCamera->setPixmap(QPixmap::fromImage(img));
+    ui.scrollCamera->setWidget(lblCamera);
+
+ /*
     switch(type) {
         case 0: {	//grayscale
                     commThread->getImg(imgBuffer);
@@ -144,7 +180,7 @@ void EpuckMonitor::cameraUpdate() {
 
         default: break;
     }
-
+*/
     return;
 
 }
@@ -240,6 +276,11 @@ void EpuckMonitor::asciiSensorsUpdate() {
     return;
 }
 
+void EpuckMonitor::updateFps() {
+    ui.lblFps->setNum(commThread->getFps());
+    ui.lblSensorsRate->setNum(commThread->getSensorsRate());
+}
+
 void EpuckMonitor::updateParameters() {
 
     width = ui.txtWidth->text().toInt();
@@ -268,121 +309,20 @@ void EpuckMonitor::updateParameters() {
     return;
 }
 
-void EpuckMonitor::goUp() {
-
-    int speed_left = motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveForward(motorSpeed);
-
-    return;
-}
-
-void EpuckMonitor::goDown() {
-
-    int speed_left = -motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = -motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveBackward(motorSpeed);
-
-    return;
-}
-
-void EpuckMonitor::goLeft() {
-
-    int speed_left = -motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveLeft(motorSpeed);
-
-    return;
-}
-
-void EpuckMonitor::goRight() {
-
-    int speed_left = motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = -motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveRight(motorSpeed);
-
-    return;
-}
-
 void EpuckMonitor::updateSpeed() {
     char str[5];
     motorSpeed = ui.sliderVel->value();
     sprintf(str, "%4d", motorSpeed);
     ui.lblVelValue->setText(str);
-}
-
-void EpuckMonitor::disconnect() {
-
-    commThread->getSensors(false);
-    commThread->getCamera(false);
-    commThread->abortThread = true;
-    commThread->wait();
-
-    //disable all graphical objects
-    ui.btnConnect->setEnabled(true);
-    ui.btnDisconnect->setEnabled(false);
-    ui.chkSensors->setEnabled(false);
-    ui.btnParameters->setEnabled(false);
-    ui.btnImage->setEnabled(false);
-    ui.btnUp->setEnabled(false);
-    ui.btnDown->setEnabled(false);
-    ui.btnRight->setEnabled(false);
-    ui.btnLeft->setEnabled(false);
-    ui.btnStop->setEnabled(false);
-    ui.btn1->setEnabled(false);
-    ui.btn2->setEnabled(false);
-    ui.btn3->setEnabled(false);
-    ui.btn4->setEnabled(false);
-    ui.btn5->setEnabled(false);
-    ui.btnAudioOff->setEnabled(false);
-    ui.checkLed0->setEnabled(false);
-    ui.checkLed1->setEnabled(false);
-    ui.checkLed2->setEnabled(false);
-    ui.checkLed3->setEnabled(false);
-    ui.checkLed4->setEnabled(false);
-    ui.checkLed5->setEnabled(false);
-    ui.checkLed6->setEnabled(false);
-    ui.checkLed7->setEnabled(false);
-    ui.checkLed8->setEnabled(false);
-    ui.checkLed9->setEnabled(false);
-    ui.sliderVel->setEnabled(false);
-    ui.txtHeight->setEnabled(false);
-    ui.txtWidth->setEnabled(false);
-    ui.txtZoom->setEnabled(false);
-    ui.radioColor->setEnabled(false);
-    ui.radioGrayscale->setEnabled(false);
-    ui.btnImage->setText("Start receiving images");
-    ui.btnTest->setEnabled(false);
-
-    return;
+    commThread->setSpeed(motorSpeed);
 }
 
 void EpuckMonitor::sensorActivation(int state) {
 
     if(state == Qt::Checked) {
-        commThread->getSensors(true);
+        commThread->enableSensors(true);
     } else {
-        commThread->getSensors(false);
+        commThread->enableSensors(false);
     }
 
     return;
@@ -392,11 +332,11 @@ void EpuckMonitor::getImages() {
     if(isReceiving) {
         isReceiving = false;
         ui.btnImage->setText("Start receiving images");
-        commThread->getCamera(false);
+        commThread->enableCamera(false);
     } else {
         isReceiving = true;
         ui.btnImage->setText("Stop receiving images");
-        commThread->getCamera(true);
+        commThread->enableCamera(true);
     }
 
     return;
@@ -411,45 +351,56 @@ void EpuckMonitor::setCommThread(CommThread *thread) {
     QObject::connect(commThread, SIGNAL(newBinaryData()), this, SLOT(binarySensorsUpdate()));
     QObject::connect(commThread, SIGNAL(newAsciiData()), this, SLOT(asciiSensorsUpdate()));
     QObject::connect(commThread, SIGNAL(newImage()), this, SLOT(cameraUpdate()));
+    commThread->setSpeed(motorSpeed);
 }
 
-void EpuckMonitor::portOpened() {
-    ui.btnConnect->setEnabled(false);
-    ui.btnDisconnect->setEnabled(true);
-    ui.chkSensors->setCheckState(Qt::Checked);
+void EpuckMonitor::updateUiState(uint8_t state) {
+    switch(state) {
+        case UI_STATE_ROBOT_DISCONNECTED:
+            commThread->enableSensors(false);
+            commThread->enableCamera(false);
+            disableUi();
+            break;
 
-    //enable all the graphical objects after the connection was established
-    ui.chkSensors->setEnabled(true);
-    ui.btnParameters->setEnabled(true);
-    ui.btnImage->setEnabled(true);
-    ui.btnUp->setEnabled(true);
-    ui.btnDown->setEnabled(true);
-    ui.btnRight->setEnabled(true);
-    ui.btnLeft->setEnabled(true);
-    ui.btnStop->setEnabled(true);
-    ui.btn1->setEnabled(true);
-    ui.btn2->setEnabled(true);
-    ui.btn3->setEnabled(true);
-    ui.btn4->setEnabled(true);
-    ui.btn5->setEnabled(true);
-    ui.btnAudioOff->setEnabled(true);
-    ui.checkLed0->setEnabled(true);
-    ui.checkLed1->setEnabled(true);
-    ui.checkLed2->setEnabled(true);
-    ui.checkLed3->setEnabled(true);
-    ui.checkLed4->setEnabled(true);
-    ui.checkLed5->setEnabled(true);
-    ui.checkLed6->setEnabled(true);
-    ui.checkLed7->setEnabled(true);
-    ui.checkLed8->setEnabled(true);
-    ui.checkLed9->setEnabled(true);
-    ui.sliderVel->setEnabled(true);
-    ui.txtHeight->setEnabled(true);
-    ui.txtWidth->setEnabled(true);
-    ui.txtZoom->setEnabled(true);
-    ui.radioColor->setEnabled(true);
-    ui.radioGrayscale->setEnabled(true);
-    ui.btnTest->setEnabled(true);
+        case UI_STATE_ROBOT_CONNECTED:
+            ui.btnConnect->setEnabled(false);
+            ui.btnDisconnect->setEnabled(true);
+            ui.chkSensors->setCheckState(Qt::Checked);
+
+            //enable all the graphical objects after the connection was established
+            ui.chkSensors->setEnabled(true);
+            //ui.btnParameters->setEnabled(true);
+            ui.btnImage->setEnabled(true);
+            ui.btnUp->setEnabled(true);
+            ui.btnDown->setEnabled(true);
+            ui.btnRight->setEnabled(true);
+            ui.btnLeft->setEnabled(true);
+            ui.btnStop->setEnabled(true);
+            //ui.btn1->setEnabled(true);
+            //ui.btn2->setEnabled(true);
+            //ui.btn3->setEnabled(true);
+            //ui.btn4->setEnabled(true);
+            //ui.btn5->setEnabled(true);
+            //ui.btnAudioOff->setEnabled(true);
+            ui.checkLed0->setEnabled(true);
+            //ui.checkLed1->setEnabled(true);
+            ui.checkLed2->setEnabled(true);
+            //ui.checkLed3->setEnabled(true);
+            ui.checkLed4->setEnabled(true);
+            //ui.checkLed5->setEnabled(true);
+            //ui.checkLed6->setEnabled(true);
+            //ui.checkLed7->setEnabled(true);
+            //ui.checkLed8->setEnabled(true);
+            //ui.checkLed9->setEnabled(true);
+            ui.sliderVel->setEnabled(true);
+            //ui.txtHeight->setEnabled(true);
+            //ui.txtWidth->setEnabled(true);
+            //ui.txtZoom->setEnabled(true);
+            //ui.radioColor->setEnabled(true);
+            //ui.radioGrayscale->setEnabled(true);
+            //ui.btnTest->setEnabled(true);
+            break;
+    }
 }
 
 void EpuckMonitor::test() {
