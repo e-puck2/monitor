@@ -29,7 +29,8 @@
 int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
-	  
+    app.setAttribute(Qt::AA_UseDesktopOpenGL);
+
     EpuckMonitor main;
     CommThread *commThread = new CommThread();
     commThread->init();
@@ -49,6 +50,16 @@ int main(int argc, char *argv[]) {
     QObject::connect(main.ui.btnLeft, SIGNAL(clicked()), commThread, SLOT(goLeft()));
     QObject::connect(main.ui.btnRight, SIGNAL(clicked()), commThread, SLOT(goRight()));
     QObject::connect(main.ui.btnStop, SIGNAL(clicked()), commThread, SLOT(stopMotors()));
+    QObject::connect(main.ui.checkLed0, SIGNAL(stateChanged(int)), commThread, SLOT(led0Slot(int)));
+    QObject::connect(main.ui.checkLed1, SIGNAL(stateChanged(int)), commThread, SLOT(led1Slot(int)));
+    QObject::connect(main.ui.checkLed2, SIGNAL(stateChanged(int)), commThread, SLOT(led2Slot(int)));
+    QObject::connect(main.ui.checkLed3, SIGNAL(stateChanged(int)), commThread, SLOT(led3Slot(int)));
+    QObject::connect(main.ui.checkLed4, SIGNAL(stateChanged(int)), commThread, SLOT(led4Slot(int)));
+    QObject::connect(main.ui.checkLed5, SIGNAL(stateChanged(int)), commThread, SLOT(led5Slot(int)));
+    QObject::connect(main.ui.checkLed6, SIGNAL(stateChanged(int)), commThread, SLOT(led6Slot(int)));
+    QObject::connect(main.ui.checkLed7, SIGNAL(stateChanged(int)), commThread, SLOT(led7Slot(int)));
+    QObject::connect(main.ui.checkLed8, SIGNAL(stateChanged(int)), commThread, SLOT(led8Slot(int)));
+    QObject::connect(main.ui.checkLed9, SIGNAL(stateChanged(int)), commThread, SLOT(led9Slot(int)));
 
 
 
@@ -61,20 +72,9 @@ int main(int argc, char *argv[]) {
     QObject::connect(main.ui.btn4, SIGNAL(clicked()), commThread, SLOT(sound4Slot()));
     QObject::connect(main.ui.btn5, SIGNAL(clicked()), commThread, SLOT(sound5Slot()));
     QObject::connect(main.ui.btnAudioOff, SIGNAL(clicked()), commThread, SLOT(audioOffSlot()));
-    QObject::connect(main.ui.checkLed0, SIGNAL(stateChanged(int)), commThread, SLOT(led0Slot(int)));
-    QObject::connect(main.ui.checkLed1, SIGNAL(stateChanged(int)), commThread, SLOT(led1Slot(int)));
-    QObject::connect(main.ui.checkLed2, SIGNAL(stateChanged(int)), commThread, SLOT(led2Slot(int)));
-    QObject::connect(main.ui.checkLed3, SIGNAL(stateChanged(int)), commThread, SLOT(led3Slot(int)));
-    QObject::connect(main.ui.checkLed4, SIGNAL(stateChanged(int)), commThread, SLOT(led4Slot(int)));
-    QObject::connect(main.ui.checkLed5, SIGNAL(stateChanged(int)), commThread, SLOT(led5Slot(int)));
-    QObject::connect(main.ui.checkLed6, SIGNAL(stateChanged(int)), commThread, SLOT(led6Slot(int)));
-    QObject::connect(main.ui.checkLed7, SIGNAL(stateChanged(int)), commThread, SLOT(led7Slot(int)));
-    QObject::connect(main.ui.checkLed8, SIGNAL(stateChanged(int)), commThread, SLOT(led8Slot(int)));
-    QObject::connect(main.ui.checkLed9, SIGNAL(stateChanged(int)), commThread, SLOT(led9Slot(int)));
     QObject::connect(main.ui.chkSensors, SIGNAL(stateChanged(int)), &main, SLOT(sensorActivation(int)));
     QObject::connect(main.ui.sliderVel, SIGNAL(valueChanged(int)), &main, SLOT(updateSpeed()));
     QObject::connect(main.ui.btnImage, SIGNAL(clicked()), &main, SLOT(getImages()));    
-
     QObject::connect(commThread, SIGNAL(showVersion(QString,int)), main.ui.statusbar, SLOT(showMessage(QString,int)));
     QObject::connect(main.ui.slideRed, SIGNAL(valueChanged(int)), commThread, SLOT(updateRed(int)));
     QObject::connect(main.ui.slideGreen, SIGNAL(valueChanged(int)), commThread, SLOT(updateGreen(int)));

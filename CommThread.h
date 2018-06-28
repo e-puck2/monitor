@@ -67,6 +67,7 @@ class CommThread : public QObject
         void enableCamera(bool b);
 
 
+
         void init();
         void closeCommunication();
         float getAcceleration(){return acceleration;}
@@ -86,6 +87,7 @@ class CommThread : public QObject
 		int getLight(){return lightAvg;}
         uint16_t getMic(uint8_t id){return micVolume[id];}
         void setSpeed(int16_t speed) { motorSpeed=speed; }
+
 
 
         int getType(){return type;}
@@ -109,20 +111,6 @@ class CommThread : public QObject
         uint8_t buttonIsPressed(void){return buttonState==1;}
 		uint8_t getMicroSdState(void){return microSdState;}
 
-
-        void sendUpdateLed1(int state);					/**< called when the "LED1" checkbox is checked/unchecked; send the command to turn on/off the LED1*/
-        void sendUpdateLed3(int state);					/**< called when the "LED3" checkbox is checked/unchecked; send the command to turn on/off the LED3*/
-        void sendUpdateLed5(int state);					/**< called when the "LED5" checkbox is checked/unchecked; send the command to turn on/off the LED5*/
-        void sendUpdateLed6(int state);					/**< called when the "LED6" checkbox is checked/unchecked; send the command to turn on/off the LED6*/
-        void sendUpdateLed7(int state);					/**< called when the "LED7" checkbox is checked/unchecked; send the command to turn on/off the LED7*/
-        void sendUpdateLed8(int state);					/**< called when the "LED8" checkbox is checked/unchecked; send the command to turn on/off the body led*/
-        void sendUpdateLed9(int state);					/**< called when the "LED9" checkbox is checked/unchecked; send the command to turn on/off the front led*/
-        void sendSound1();					/**< called when the "1" button is clicked; send the command to play the first sound*/
-        void sendSound2();					/**< called when the "2" button is clicked; send the command to play the second sound*/
-        void sendSound3();					/**< called when the "3" button is clicked; send the command to play the third sound*/
-        void sendSound4();					/**< called when the "4" button is clicked; send the command to play the fourth sound*/
-        void sendSound5();					/**< called when the "5" button is clicked; send the command to play the fifth sound*/
-        void sendAudioOff();
 
         bool headerReceived;					/**< boolean indicating whether or not the first three bytes of the image data (header) was received*/
         bool imgReceived;						/**< boolean indicating whether or not the image was received completely*/
@@ -154,6 +142,7 @@ class CommThread : public QObject
         uint8_t microSdState;
         uint8_t next_request;
         int16_t motorSpeed;
+        bool send_cmd;
 
 
         int acc_x, acc_y, acc_z, roll_acc, pitch_acc;	        
@@ -164,9 +153,7 @@ class CommThread : public QObject
         unsigned int height;					/**< height of the image to be received*/
         unsigned int pixNum;					/**< total number of pixels (bytes) to be received; in case of grayscale image it is width*height, in case of color image it is width*height*2 (RGB565)*/
         unsigned int zoom;
-        bool updateLed1Now, updateLed3Now, updateLed5Now, updateLed6Now, updateLed7Now, updateLed8Now, updateLed9Now;
-        bool sound1Now, sound2Now, sound3Now, sound4Now, sound5Now, audioOffNow;        
-        int stateLed0, stateLed1, stateLed2, stateLed3, stateLed4, stateLed5, stateLed6, stateLed7, stateLed8, stateLed9;
+        int stateLed1, stateLed3, stateLed5, stateLed7;
         uint8_t asercomVer;
         uint8_t rgbLedValue[3];
         uint8_t rgbLedState[12];
@@ -193,15 +180,15 @@ class CommThread : public QObject
         void led7Slot(int state);
         void led8Slot(int state);
         void led9Slot(int state);
-
-
-        void updateParameters(int t, int w, int h, int z);		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/        
         void sound1Slot();
         void sound2Slot();
         void sound3Slot();
         void sound4Slot();
         void sound5Slot();
         void audioOffSlot();
+
+
+        void updateParameters(int t, int w, int h, int z);		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/        
         void updateRed(int value);
         void updateGreen(int value);
         void updateBlue(int value);
@@ -211,8 +198,10 @@ class CommThread : public QObject
         void newImage();
         void updateUiState(uint8_t);
         void updateFps();
-
         void newBinaryData();
+
+
+
         void newAsciiData();        
         void cannotOpenPort(QString s);
         void showVersion(QString, int);

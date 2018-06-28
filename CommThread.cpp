@@ -33,8 +33,6 @@ void CommThread::init() {
     height = 40;					/**< height of the image to be received*/
     pixNum = 3200;
     zoom = 8;
-   updateLed1Now = false; updateLed3Now = false; updateLed5Now = false; updateLed6Now = false; updateLed7Now = false; updateLed8Now = false; updateLed9Now = false;
-    sound1Now = false; sound2Now = false; sound3Now = false; sound4Now = false; sound5Now = false; audioOffNow = false;  
 
     socket = new QTcpSocket(this);
     connect(socket, SIGNAL(connected()),this, SLOT(connected()));
@@ -65,7 +63,7 @@ void CommThread::connected()
     qDebug() << "connected...";
     emit updateUiState(UI_STATE_ROBOT_CONNECTED);
 
-    output_buffer[0] = 0x03;
+    output_buffer[0] = 0x80;
     output_buffer[1] = 0x02; // Bit0: start/stop image stream; bit1: start/stop sensors stream.
     output_buffer[2] = 0x00; // Left speed LSB
     output_buffer[3] = 0x00; // Left speed MSB
@@ -115,10 +113,13 @@ void CommThread::readyRead()
                     read_state = 1;
                 } else if(input_buffer[0] == 0x02) {
                     read_state = 2;
-                } else if(input_buffer[0] == 0x04) {
-                    output_buffer[1] = next_request;
-                    //qDebug() << "next req 0 = " << next_request;
-                    socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                } else if(input_buffer[0] == 0x03) {
+                    if(send_cmd) {
+                        send_cmd = false;
+                        output_buffer[1] = next_request;
+                        //qDebug() << "next req 0 = " << next_request;
+                        socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                    }
                 }
                 packet_index = 0;
                 break;
@@ -132,9 +133,12 @@ void CommThread::readyRead()
                     img_count++;
                     emit newImage();
                     if((output_buffer[1]&0x02) == 0x00) { // If only image is streamed.
-                        output_buffer[1] = next_request;
-                        //qDebug() << "next req 1 = " << next_request;
-                        socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                        if(send_cmd) {
+                            send_cmd = false;
+                            output_buffer[1] = next_request;
+                            //qDebug() << "next req 1 = " << next_request;
+                            socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                        }
                     }
                     read_state = 0;
                 }
@@ -258,17 +262,20 @@ void CommThread::readyRead()
                     memset(distanceCmStr, 0x0, 5);
                     sprintf(distanceCmStr, "%d", (distanceCm>200)?200:distanceCm);
 
-                    // Button state.
-                    buttonState = input_buffer[62];
-
                     // Micro sd state.
-                    microSdState = input_buffer[63];
+                    microSdState = input_buffer[62];
+
+                    // Button state.
+                    buttonState = input_buffer[63];
 
                     sensors_count++;
                     emit newBinaryData();
-                    output_buffer[1] = next_request;
-                    //qDebug() << "next req 2 = " << next_request;
-                    socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                    if(send_cmd) {
+                        send_cmd = false;
+                        output_buffer[1] = next_request;
+                        //qDebug() << "next req 2 = " << next_request;
+                        socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                    }
                     read_state = 0;
                 }
                 break;
@@ -285,6 +292,7 @@ void CommThread::enableSensors(bool state) {
     } else {
         next_request &= ~(0x02);
     }
+    send_cmd = true;
 }
 
 void CommThread::enableCamera(bool state) {
@@ -293,6 +301,7 @@ void CommThread::enableCamera(bool state) {
     } else {
         next_request &= ~(0x01);
     }
+    send_cmd = true;
 }
 
 
@@ -309,109 +318,6 @@ void CommThread::timerEvent() {
     img_count = 0;
     sensors_count = 0;
     emit updateFps();
-}
-
-
-
-
-void CommThread::run() {
-
-    char msg[50];
-    int bytes=1;
-    long  mantis=0;
-    short  exp=0;
-    float flt=0;
-    uint8_t bytesToRead = 0;
-    uint8_t bytesToSend = 0;
-    bool reconnectFlag = false;
-
-    abortThread = false;
-
-    while(!abortThread) {
-
-        QThread::msleep(20); // Keep main thread (GUI) responsive.
-
-
-        if(updateLed1Now) {
-            updateLed1Now = false;
-            sendUpdateLed1(stateLed1);
-            QThread::usleep(20000);
-        }
-
-        if(updateLed3Now) {
-            updateLed3Now = false;
-            sendUpdateLed3(stateLed3);
-            QThread::usleep(20000);
-        }
-
-        if(updateLed5Now) {
-            updateLed5Now = false;
-            sendUpdateLed5(stateLed5);
-            QThread::usleep(20000);
-        }
-
-        if(updateLed6Now) {
-            updateLed6Now = false;
-            sendUpdateLed6(stateLed6);
-            QThread::usleep(20000);
-        }
-
-        if(updateLed7Now) {
-            updateLed7Now = false;
-            sendUpdateLed7(stateLed7);
-            QThread::usleep(20000);
-        }
-
-        if(updateLed8Now) {
-            updateLed8Now = false;
-            sendUpdateLed8(stateLed8);
-            QThread::usleep(20000);
-        }
-
-        if(updateLed9Now) {
-            updateLed9Now = false;
-            sendUpdateLed9(stateLed9);
-            QThread::usleep(20000);
-        }
-
-        if(sound1Now) {
-            sound1Now = false;
-            sendSound1();
-        }
-
-        if(sound2Now) {
-            sound2Now = false;
-            sendSound2();
-        }
-
-        if(sound3Now) {
-            sound3Now = false;
-            sendSound3();
-        }
-
-        if(sound4Now) {
-            sound4Now = false;
-            sendSound4();
-        }
-
-        if(sound5Now) {
-            sound5Now = false;
-            sendSound5();
-        }
-
-        if(audioOffNow) {
-            audioOffNow = false;
-            sendAudioOff();
-        }
-
-    }   // end infinite loop
-
-    closeCommunication();
-    QThread::msleep(300);
- //   if(reconnectFlag) {
- //       emit reconnect();
- //   }
-
 }
 
 void CommThread::getImg(unsigned char *img) {
@@ -440,8 +346,70 @@ void CommThread::updateParameters(int t, int w, int h, int z) {
     return;
 }
 
-void CommThread::sendUpdateLed1(int state) {
-    uint8_t bytesToSend = 0;
+void CommThread::goForward() {
+    //qDebug() << "go fw";
+    int speed_left = motorSpeed;
+    output_buffer[2] = speed_left & 0xFF;
+    output_buffer[3] = (speed_left>>8) & 0xFF;
+    int speed_right = motorSpeed;
+    output_buffer[4] = speed_right & 0xFF;
+    output_buffer[5] = (speed_right>>8) & 0xFF;
+    send_cmd = true;
+}
+
+void CommThread::goBackward() {
+    //qDebug() << "go bw";
+    int speed_left = -motorSpeed;
+    output_buffer[2] = speed_left & 0xFF;
+    output_buffer[3] = (speed_left>>8) & 0xFF;
+    int speed_right = -motorSpeed;
+    output_buffer[4] = speed_right & 0xFF;
+    output_buffer[5] = (speed_right>>8) & 0xFF;
+    send_cmd = true;
+}
+
+void CommThread::goLeft() {
+    //qDebug() << "go sx";
+    int speed_left = -motorSpeed;
+    output_buffer[2] = speed_left & 0xFF;
+    output_buffer[3] = (speed_left>>8) & 0xFF;
+    int speed_right = motorSpeed;
+    output_buffer[4] = speed_right & 0xFF;
+    output_buffer[5] = (speed_right>>8) & 0xFF;
+    send_cmd = true;
+}
+
+void CommThread::goRight() {
+    //qDebug() << "go dx";
+    int speed_left = motorSpeed;
+    output_buffer[2] = speed_left & 0xFF;
+    output_buffer[3] = (speed_left>>8) & 0xFF;
+    int speed_right = -motorSpeed;
+    output_buffer[4] = speed_right & 0xFF;
+    output_buffer[5] = (speed_right>>8) & 0xFF;
+    send_cmd = true;
+}
+
+void CommThread::stopMotors() {
+    //qDebug() << "stop";
+    output_buffer[2] = 0;
+    output_buffer[3] = 0;
+    output_buffer[4] = 0;
+    output_buffer[5] = 0;
+    send_cmd = true;
+}
+
+void CommThread::led0Slot(int state) {
+    if(state == Qt::Checked) {
+        output_buffer[6] = 1;
+    } else {
+        output_buffer[6] = 0;
+    }
+    send_cmd = true;
+}
+
+void CommThread::led1Slot(int state) {
+//    uint8_t bytesToSend = 0;
 //    memset(command, 0x0, 20);
 //
 //    if(state == Qt::Checked) {
@@ -469,12 +437,19 @@ void CommThread::sendUpdateLed1(int state) {
 //    }
 
 //    comm->writeData(command, bytesToSend, 12000);
-
-    return;
 }
 
-void CommThread::sendUpdateLed3(int state) {
-    uint8_t bytesToSend = 0;
+void CommThread::led2Slot(int state) {
+    if(state == Qt::Checked) {
+        output_buffer[7] = 1;
+    } else {
+        output_buffer[7] = 0;
+    }
+    send_cmd = true;
+}
+
+void CommThread::led3Slot(int state) {
+//    uint8_t bytesToSend = 0;
 //    memset(command, 0x0, 20);
 
 //    if(state == Qt::Checked) {
@@ -502,12 +477,19 @@ void CommThread::sendUpdateLed3(int state) {
 //    }
 
 //    comm->writeData(command, bytesToSend, 12000);
-
-    return;
 }
 
-void CommThread::sendUpdateLed5(int state) {
-    uint8_t bytesToSend = 0;
+void CommThread::led4Slot(int state) {
+    if(state == Qt::Checked) {
+        output_buffer[8] = 1;
+    } else {
+        output_buffer[8] = 0;
+    }
+    send_cmd = true;
+}
+
+void CommThread::led5Slot(int state) {
+//    uint8_t bytesToSend = 0;
 //    memset(command, 0x0, 20);
 
 //    if(state == Qt::Checked) {
@@ -535,27 +517,19 @@ void CommThread::sendUpdateLed5(int state) {
 //    }
 
 //    comm->writeData(command, bytesToSend, 12000);
-
-    return;
 }
 
-void CommThread::sendUpdateLed6(int state) {
-
-//    memset(command, 0x0, 20);
-
-//    if(state == Qt::Checked) {
-//        sprintf(command, "%c%c%c%c",-'L', 6, 1, 0);
-//    } else {
-//        sprintf(command, "%c%c%c%c",-'L', 6, 0, 0);
-//    }
-
-//    comm->writeData(command, 4, 12000);
-
-    return;
+void CommThread::led6Slot(int state) {
+    if(state == Qt::Checked) {
+        //output_buffer[...] = 1;
+    } else {
+        //output_buffer[...] = 0;
+    }
+    send_cmd = true;
 }
 
-void CommThread::sendUpdateLed7(int state) {
-    uint8_t bytesToSend = 0;
+void CommThread::led7Slot(int state) {
+//    uint8_t bytesToSend = 0;
 //    memset(command, 0x0, 20);
 
 //    if(state == Qt::Checked) {
@@ -583,241 +557,78 @@ void CommThread::sendUpdateLed7(int state) {
 //    }
 
 //    comm->writeData(command, bytesToSend, 12000);
-
-    return;
-}
-
-void CommThread::sendUpdateLed8(int state) {
-
-//    memset(command, 0x0, 20);
-
-//    if(state == Qt::Checked) {
-//        sprintf(command, "%c%c%c%c",-'L', 8, 1, 0);
-//    } else {
-//        sprintf(command, "%c%c%c%c",-'L', 8, 0, 0);
-//    }
-
-//    comm->writeData(command, 4, 12000);
-
-    return;
-}
-
-void CommThread::sendUpdateLed9(int state) {
-
-//    memset(command, 0x0, 20);
-
-//    if(state == Qt::Checked) {
-//        sprintf(command, "%c%c%c%c",-'L', 9, 1, 0);
-//    } else {
-//        sprintf(command, "%c%c%c%c",-'L', 9, 0, 0);
-//    }
-
-//    comm->writeData(command, 4, 12000);
-
-    return;
-}
-
-void CommThread::sendSound1() {
-
-//    comm->writeData("T,1\r",4,12000);
-//    comm->readData(RxBuffer,3,200000);
-
-    return;
-}
-
-void CommThread::sendSound2() {
-
-//    comm->writeData("T,2\r",4,12000);
-//    comm->readData(RxBuffer,3,200000);
-
-    return;
-}
-
-void CommThread::sendSound3() {
-
-//    comm->writeData("T,3\r",4,12000);
-//    comm->readData(RxBuffer,3,200000);
-
-    return;
-}
-
-void CommThread::sendSound4() {
-
-//    comm->writeData("T,4\r",4,12000);
-//    comm->readData(RxBuffer,3,200000);
-
-    return;
-}
-
-void CommThread::sendSound5() {
-
-//    comm->writeData("T,5\r",4,12000);
-//    comm->readData(RxBuffer,3,200000);
-
-    return;
-}
-
-void CommThread::sendAudioOff() {
-
-//    comm->writeData("T,6\r",4,12000);
-//    comm->readData(RxBuffer,3,200000);
-
-    return;
-}
-
-void CommThread::goForward() {
-    //qDebug() << "go fw";
-    int speed_left = motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
-    int speed_right = motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
-}
-
-void CommThread::goBackward() {
-    //qDebug() << "go bw";
-    int speed_left = -motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
-    int speed_right = -motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
-}
-
-void CommThread::goLeft() {
-    //qDebug() << "go sx";
-    int speed_left = -motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
-    int speed_right = motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
-}
-
-void CommThread::goRight() {
-    //qDebug() << "go dx";
-    int speed_left = motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
-    int speed_right = -motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
-}
-
-void CommThread::stopMotors() {
-    //qDebug() << "stop";
-    output_buffer[2] = 0;
-    output_buffer[3] = 0;
-    output_buffer[4] = 0;
-    output_buffer[5] = 0;
-}
-
-void CommThread::led0Slot(int state) {
-    if(state == Qt::Checked) {
-        output_buffer[6] = 1;
-    } else {
-        output_buffer[6] = 0;
-    }
-}
-
-void CommThread::led1Slot(int state) {
-    stateLed1 = state;
-    updateLed1Now = true;
-}
-
-void CommThread::led2Slot(int state) {
-    if(state == Qt::Checked) {
-        output_buffer[7] = 1;
-    } else {
-        output_buffer[7] = 0;
-    }
-}
-
-void CommThread::led3Slot(int state) {
-    stateLed3 = state;
-    updateLed3Now = true;
-}
-
-void CommThread::led4Slot(int state) {
-    if(state == Qt::Checked) {
-        output_buffer[8] = 1;
-    } else {
-        output_buffer[8] = 0;
-    }
-}
-
-void CommThread::led5Slot(int state) {
-    stateLed5 = state;
-    updateLed5Now = true;
-}
-
-void CommThread::led6Slot(int state) {
-    stateLed6 = state;
-    updateLed6Now = true;
-}
-
-void CommThread::led7Slot(int state) {
-    stateLed7 = state;
-    updateLed7Now = true;
 }
 
 void CommThread::led8Slot(int state) {
-    stateLed8 = state;
-    updateLed8Now = true;
+    if(state == Qt::Checked) {
+        //output_buffer[...] = 1;
+    } else {
+        //output_buffer[...] = 0;
+    }
+    send_cmd = true;
 }
 
 void CommThread::led9Slot(int state) {
-    stateLed9 = state;
-    updateLed9Now = true;
+    if(state == Qt::Checked) {
+        //output_buffer[...] = 1;
+    } else {
+        //output_buffer[...] = 0;
+    }
+    send_cmd = true;
 }
 
 void CommThread::sound1Slot() {
-    sound1Now = true;
+    //output_buffer[...] = 1;
+    send_cmd = true;
 }
 
 void CommThread::sound2Slot() {
-    sound2Now = true;
+    //output_buffer[...] = 2;
+    send_cmd = true;
 }
 
 void CommThread::sound3Slot() {
-    sound3Now = true;
+    //output_buffer[...] = 3;
+    send_cmd = true;
 }
 
 void CommThread::sound4Slot() {
-    sound4Now = true;
+    //output_buffer[...] = 4;
+    send_cmd = true;
 }
 
 void CommThread::sound5Slot() {
-    sound5Now = true;
+    //output_buffer[...] = 5;
+    send_cmd = true;
 }
 
 void CommThread::audioOffSlot() {
-    audioOffNow = true;
+    //output_buffer[...] = 6;
+    send_cmd = true;
 }
 
 void CommThread::updateRed(int value) {
     rgbLedValue[0] = value;
-    updateLed1Now = true;
-    updateLed3Now = true;
-    updateLed5Now = true;
-    updateLed7Now = true;
+    //updateLed1Now = true;
+    //updateLed3Now = true;
+    //updateLed5Now = true;
+    //updateLed7Now = true;
 }
 
 void CommThread::updateGreen(int value) {
     rgbLedValue[1] = value;
-    updateLed1Now = true;
-    updateLed3Now = true;
-    updateLed5Now = true;
-    updateLed7Now = true;
+    //updateLed1Now = true;
+    //updateLed3Now = true;
+    //updateLed5Now = true;
+    //updateLed7Now = true;
 }
 
 void CommThread::updateBlue(int value) {
     rgbLedValue[2] = value;
-    updateLed1Now = true;
-    updateLed3Now = true;
-    updateLed5Now = true;
-    updateLed7Now = true;
+    //updateLed1Now = true;
+    //updateLed3Now = true;
+    //updateLed5Now = true;
+    //updateLed7Now = true;
 }
 
 
