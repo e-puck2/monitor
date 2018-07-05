@@ -50,7 +50,8 @@
 #define IMAGE_BUFF_SIZE (4056+3)
 
 #define MAX_BUFF_SIZE 38400 // Color QQVGA (160x120x2)
-#define OUTPUT_BUFFER_SIZE 9
+#define OUTPUT_BUFFER_SIZE 21
+#define INPUT_BUFFER_SIZE 98
 
 class CommThread : public QObject
 {
@@ -65,7 +66,14 @@ class CommThread : public QObject
         void getImg(unsigned char *img);
         void enableSensors(bool b);
         void enableCamera(bool b);
-
+        uint16_t getDistanceCm(void){return distanceCm;}
+        char* getDistanceCmStr(void){return distanceCmStr;}
+        uint8_t buttonIsPressed(void){return buttonState==1;}
+        uint8_t getMicroSdState(void){return microSdState;}
+        char* getSelector(){return selectorStr;}
+        char* getIrCheck(){return irCheckStr;}
+        char* getIrAddress(){return irAddressStr;}
+        char* getIrData(){return irDataStr;}
 
 
         void init();
@@ -73,9 +81,6 @@ class CommThread : public QObject
         float getAcceleration(){return acceleration;}
         float getOrientation(){return orientation;}
         float getInclination(){return inclination;}
-        int getAccX(){return acc_x;}
-        int getAccY(){return acc_y;}
-        int getAccZ(){return acc_z;}
 		int getIr0(){return ir0;}
 		int getIr1(){return ir1;}
 		int getIr2(){return ir2;}
@@ -87,17 +92,10 @@ class CommThread : public QObject
 		int getLight(){return lightAvg;}
         uint16_t getMic(uint8_t id){return micVolume[id];}
         void setSpeed(int16_t speed) { motorSpeed=speed; }
-
-
-
         int getType(){return type;}
         int getWidth(){return width;}
         int getHeight(){return height;}
         int getPixNum(){return pixNum;}
-        char* getSelector(){return selectorStr;}
-        char* getIrCheck(){return irCheckStr;}
-        char* getIrAddress(){return irAddressStr;}
-        char* getIrData(){return irDataStr;}
         void setImgType(int t) { type = t; }
         void setImgWidth(int w) { width = w; }
         void setImgHeight(int h) { height = h; }
@@ -105,17 +103,7 @@ class CommThread : public QObject
         uint16_t getBatteryRaw(){return batteryRaw;}
         char* getBatteryRawStr(){return batteryRawStr;}
         int16_t getGyroRaw(uint8_t axis){return gyroRaw[axis];}
-        uint8_t getAsercomVer(void){return asercomVer;}
-        uint16_t getDistanceCm(void){return distanceCm;}
-        char* getDistanceCmStr(void){return distanceCmStr;}
-        uint8_t buttonIsPressed(void){return buttonState==1;}
-		uint8_t getMicroSdState(void){return microSdState;}
-
-
-        bool headerReceived;					/**< boolean indicating whether or not the first three bytes of the image data (header) was received*/
-        bool imgReceived;						/**< boolean indicating whether or not the image was received completely*/
-        bool wrongAnswer;						/**< boolean indicating whether or not a wrong header was received*/
-        bool abortThread;
+        float getMagneticField(uint8_t axis){return magneticField[axis];}
 
     private:
         QTcpSocket *socket;
@@ -143,20 +131,23 @@ class CommThread : public QObject
         uint8_t next_request;
         int16_t motorSpeed;
         bool send_cmd;
+        float magneticField[3];
+        int16_t leftSteps, rightSteps;
+        uint8_t irCheck, irAddress, irData;
+        uint8_t selector;
+        uint8_t temperature;
+        int16_t groundProx[3], groundAmbient[3];
+        uint8_t rgbLedValue[3];
+        int rgbLedState[4];
+        char selectorStr[3];
+        char irCheckStr[8], irAddressStr[8], irDataStr[8];
 
 
-        int acc_x, acc_y, acc_z, roll_acc, pitch_acc;	        
-        char selectorStr[3];								/**< selector data*/
-        char irCheckStr[8], irAddressStr[8], irDataStr[8];	/**< IR data*/
         unsigned int type;						/**< type of the image: color (value 1) or grayscale (value 0)*/
         unsigned int width;						/**< width of the image to be received*/
         unsigned int height;					/**< height of the image to be received*/
         unsigned int pixNum;					/**< total number of pixels (bytes) to be received; in case of grayscale image it is width*height, in case of color image it is width*height*2 (RGB565)*/
         unsigned int zoom;
-        int stateLed1, stateLed3, stateLed5, stateLed7;
-        uint8_t asercomVer;
-        uint8_t rgbLedValue[3];
-        uint8_t rgbLedState[12];
 
 
     public slots:
@@ -186,12 +177,12 @@ class CommThread : public QObject
         void sound4Slot();
         void sound5Slot();
         void audioOffSlot();
-
-
-        void updateParameters(int t, int w, int h, int z);		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/        
         void updateRed(int value);
         void updateGreen(int value);
         void updateBlue(int value);
+
+
+        void updateParameters(int t, int w, int h, int z);		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/        
 
     signals:
         void connectionClosed();
@@ -199,7 +190,6 @@ class CommThread : public QObject
         void updateUiState(uint8_t);
         void updateFps();
         void newBinaryData();
-
 
 
         void newAsciiData();        

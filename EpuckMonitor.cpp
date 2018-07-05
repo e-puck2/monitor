@@ -260,18 +260,19 @@ void EpuckMonitor::binarySensorsUpdate() {
         ui.lblSdStateTxt->setText("fail");
 	}
 
-    return;
-}
-
-void EpuckMonitor::asciiSensorsUpdate() {
-
     //selector data
     ui.lblSelector->setText(commThread->getSelector());
     ui.dialSelector->setValue(atoi(commThread->getSelector()));
+
     //IR data
     ui.lblIRcheck->setText(commThread->getIrCheck());
     ui.lblIRaddress->setText(commThread->getIrAddress());
     ui.lblIRdata->setText(commThread->getIrData());
+
+    // Magnetometer
+    ui.lblMagnetX->setText(QString::number(commThread->getMagneticField(0), 'f', 3));
+    ui.lblMagnetY->setText(QString::number(commThread->getMagneticField(1), 'f', 3));
+    ui.lblMagnetZ->setText(QString::number(commThread->getMagneticField(2), 'f', 3));
 
     return;
 }
@@ -376,22 +377,22 @@ void EpuckMonitor::updateUiState(uint8_t state) {
             ui.btnRight->setEnabled(true);
             ui.btnLeft->setEnabled(true);
             ui.btnStop->setEnabled(true);
-            //ui.btn1->setEnabled(true);
-            //ui.btn2->setEnabled(true);
-            //ui.btn3->setEnabled(true);
-            //ui.btn4->setEnabled(true);
-            //ui.btn5->setEnabled(true);
-            //ui.btnAudioOff->setEnabled(true);
+            ui.btn1->setEnabled(true);
+            ui.btn2->setEnabled(true);
+            ui.btn3->setEnabled(true);
+            ui.btn4->setEnabled(true);
+            ui.btn5->setEnabled(true);
+            ui.btnAudioOff->setEnabled(true);
             ui.checkLed0->setEnabled(true);
-            //ui.checkLed1->setEnabled(true);
+            ui.checkLed1->setEnabled(true);
             ui.checkLed2->setEnabled(true);
-            //ui.checkLed3->setEnabled(true);
+            ui.checkLed3->setEnabled(true);
             ui.checkLed4->setEnabled(true);
-            //ui.checkLed5->setEnabled(true);
-            //ui.checkLed6->setEnabled(true);
-            //ui.checkLed7->setEnabled(true);
-            //ui.checkLed8->setEnabled(true);
-            //ui.checkLed9->setEnabled(true);
+            ui.checkLed5->setEnabled(true);
+            ui.checkLed6->setEnabled(true);
+            ui.checkLed7->setEnabled(true);
+            ui.checkLed8->setEnabled(true);
+            ui.checkLed9->setEnabled(true);
             ui.sliderVel->setEnabled(true);
             //ui.txtHeight->setEnabled(true);
             //ui.txtWidth->setEnabled(true);

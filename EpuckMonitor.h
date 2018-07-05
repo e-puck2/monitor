@@ -89,14 +89,12 @@ class EpuckMonitor : public QMainWindow
         void updateUiState(uint8_t state);
         void updateFps();
 
-
         void connect();					/**< called when the "Connect" button is clicked; initialize the connection and the threads*/
         void disconnect();				/**< called when the "Disconnect" button is clicked; stop the connection and the threads if they are running*/
         void updateParameters();		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/
         void sensorActivation(int state);		/**< called when the "Activate Sensors" checkbox is checked/unchecked; activate/deactivate the threads for receiveing data from the sensors*/
         void updateSpeed();				/**< called when the slider changes its state; update the "motorSpeed" variable accordingly*/
         void binarySensorsUpdate();		/**< called when the "binaraySensorThread" terminates; update the graphical objects accordingly to the received data*/
-        void asciiSensorsUpdate();		/**< called when the "asciiSensorThread" terminates; update the graphical objects accordingly to the received data*/
         void cameraUpdate();			/**< called when the "cameraThread" terminates; update the image accordingly to the received data*/
         void getImages();				/**< called when the "Get Image" button is clicked; start the "cameraThread" in order to receive an image from the robot*/
         void printMessage(QString s);

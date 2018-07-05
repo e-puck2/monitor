@@ -65,13 +65,25 @@ void CommThread::connected()
 
     output_buffer[0] = 0x80;
     output_buffer[1] = 0x02; // Bit0: start/stop image stream; bit1: start/stop sensors stream.
-    output_buffer[2] = 0x00; // Left speed LSB
-    output_buffer[3] = 0x00; // Left speed MSB
-    output_buffer[4] = 0x00; // Right speed LSB
-    output_buffer[5] = 0x00; // Right speed MSB
-    output_buffer[6] = 0x00; // LED1
-    output_buffer[7] = 0x00; // LED3
-    output_buffer[8] = 0x00; // LED5
+    output_buffer[2] = 0x00; // Behavior / others
+    output_buffer[3] = 0x00; // Left speed LSB
+    output_buffer[4] = 0x00; // Left speed MSB
+    output_buffer[5] = 0x00; // Right speed LSB
+    output_buffer[6] = 0x00; // Right speed MSB
+    output_buffer[7] = 0x00; // LEDs
+    output_buffer[8] = 0x00; // LED2 red
+    output_buffer[9] = 0x00; // LED2 green
+    output_buffer[10] = 0x00; // LED2 blue
+    output_buffer[11] = 0x00; // LED4 red
+    output_buffer[12] = 0x00; // LED4 green
+    output_buffer[13] = 0x00; // LED4 blue
+    output_buffer[14] = 0x00; // LED6 red
+    output_buffer[15] = 0x00; // LED6 green
+    output_buffer[16] = 0x00; // LED6 blue
+    output_buffer[17] = 0x00; // LED8 red
+    output_buffer[18] = 0x00; // LED8 green
+    output_buffer[19] = 0x00; // LED8 blue
+    output_buffer[20] = 0x00; // sound
 
     next_request = output_buffer[1];
 
@@ -119,6 +131,7 @@ void CommThread::readyRead()
                         output_buffer[1] = next_request;
                         //qDebug() << "next req 0 = " << next_request;
                         socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                        output_buffer[20] = 0; // Clear sound value.
                     }
                 }
                 packet_index = 0;
@@ -138,6 +151,7 @@ void CommThread::readyRead()
                             output_buffer[1] = next_request;
                             //qDebug() << "next req 1 = " << next_request;
                             socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                            output_buffer[20] = 0; // Clear sound value.
                         }
                     }
                     read_state = 0;
@@ -145,13 +159,13 @@ void CommThread::readyRead()
                 break;
 
             case 2: // Read sensors
-                packet_index += socket->read((char*)&input_buffer[packet_index], 64-packet_index);
+                packet_index += socket->read((char*)&input_buffer[packet_index], INPUT_BUFFER_SIZE-packet_index);
                 //qDebug() << "ind = " << packet_index;
 
-                if(packet_index == 64) {
+                if(packet_index == INPUT_BUFFER_SIZE) {
                     packet_index = 0;
 
-                    //for(int i=0; i<64; i++) {
+                    //for(int i=0; i<INPUT_BUFFER_SIZE; i++) {
                     //    qDebug() << std::dec << (int)input_buffer[i] << ", ";
                     //}
 
@@ -192,15 +206,28 @@ void CommThread::readyRead()
                     if (inclination > 180.0 )
                         inclination=180.0;
 
+                    // Gyro
+                    gyroRaw[0] = input_buffer[12]+input_buffer[13]*256;
+                    gyroRaw[1] = input_buffer[14]+input_buffer[15]*256;
+                    gyroRaw[2] = input_buffer[16]+input_buffer[17]*256;
+
+                    // Magnetometer
+                    magneticField[0] = *((float*)&input_buffer[18]);
+                    magneticField[1] = *((float*)&input_buffer[22]);
+                    magneticField[2] = *((float*)&input_buffer[26]);
+
+                    // Temperature.
+                    temperature = input_buffer[30];
+
                     // Proximity sensors data.
-                    ir0 = (input_buffer[12]+input_buffer[13]*256>2000)?2000:input_buffer[12]+input_buffer[13]*256;
-                    ir1 = (input_buffer[14]+input_buffer[15]*256>2000)?2000:input_buffer[14]+input_buffer[15]*256;
-                    ir2 = (input_buffer[16]+input_buffer[17]*256>2000)?2000:input_buffer[16]+input_buffer[17]*256;
-                    ir3 = (input_buffer[18]+input_buffer[19]*256>2000)?2000:input_buffer[18]+input_buffer[19]*256;
-                    ir4 = (input_buffer[20]+input_buffer[21]*256>2000)?2000:input_buffer[20]+input_buffer[21]*256;
-                    ir5 = (input_buffer[22]+input_buffer[23]*256>2000)?2000:input_buffer[22]+input_buffer[23]*256;
-                    ir6 = (input_buffer[24]+input_buffer[25]*256>2000)?2000:input_buffer[24]+input_buffer[25]*256;
-                    ir7 = (input_buffer[26]+input_buffer[27]*256>2000)?2000:input_buffer[26]+input_buffer[27]*256;
+                    ir0 = (input_buffer[31]+input_buffer[32]*256>2000)?2000:input_buffer[31]+input_buffer[32]*256;
+                    ir1 = (input_buffer[33]+input_buffer[34]*256>2000)?2000:input_buffer[33]+input_buffer[34]*256;
+                    ir2 = (input_buffer[35]+input_buffer[36]*256>2000)?2000:input_buffer[35]+input_buffer[36]*256;
+                    ir3 = (input_buffer[37]+input_buffer[38]*256>2000)?2000:input_buffer[37]+input_buffer[38]*256;
+                    ir4 = (input_buffer[39]+input_buffer[40]*256>2000)?2000:input_buffer[39]+input_buffer[40]*256;
+                    ir5 = (input_buffer[41]+input_buffer[42]*256>2000)?2000:input_buffer[41]+input_buffer[42]*256;
+                    ir6 = (input_buffer[43]+input_buffer[44]*256>2000)?2000:input_buffer[43]+input_buffer[44]*256;
+                    ir7 = (input_buffer[45]+input_buffer[46]*256>2000)?2000:input_buffer[45]+input_buffer[46]*256;
                     if(ir0<0) {
                         ir0=0;
                     }
@@ -227,46 +254,73 @@ void CommThread::readyRead()
                     }
 
                     // Compute abmient light.
-                    lightAvg += (input_buffer[28]+input_buffer[29]*256);
-                    lightAvg += (input_buffer[30]+input_buffer[31]*256);
-                    lightAvg += (input_buffer[32]+input_buffer[33]*256);
-                    lightAvg += (input_buffer[34]+input_buffer[35]*256);
-                    lightAvg += (input_buffer[36]+input_buffer[37]*256);
-                    lightAvg += (input_buffer[38]+input_buffer[39]*256);
-                    lightAvg += (input_buffer[40]+input_buffer[41]*256);
-                    lightAvg += (input_buffer[42]+input_buffer[43]*256);
+                    lightAvg += (input_buffer[47]+input_buffer[48]*256);
+                    lightAvg += (input_buffer[49]+input_buffer[50]*256);
+                    lightAvg += (input_buffer[51]+input_buffer[52]*256);
+                    lightAvg += (input_buffer[53]+input_buffer[54]*256);
+                    lightAvg += (input_buffer[55]+input_buffer[56]*256);
+                    lightAvg += (input_buffer[57]+input_buffer[58]*256);
+                    lightAvg += (input_buffer[59]+input_buffer[60]*256);
+                    lightAvg += (input_buffer[61]+input_buffer[62]*256);
                     lightAvg = (int) (lightAvg/8);
                     lightAvg = (lightAvg>4000)?4000:lightAvg;
                     if(lightAvg<0) {
                         lightAvg=0;
                     }
 
-                    // Microphone
-                    micVolume[0] = ((uint8_t)input_buffer[44]+(uint8_t)input_buffer[45]*256>1500)?1500:((uint8_t)input_buffer[44]+(uint8_t)input_buffer[45]*256);
-                    micVolume[1] = ((uint8_t)input_buffer[46]+(uint8_t)input_buffer[47]*256>1500)?1500:((uint8_t)input_buffer[46]+(uint8_t)input_buffer[47]*256);
-                    micVolume[2] = ((uint8_t)input_buffer[48]+(uint8_t)input_buffer[49]*256>1500)?1500:((uint8_t)input_buffer[48]+(uint8_t)input_buffer[49]*256);
-                    micVolume[3] = ((uint8_t)input_buffer[50]+(uint8_t)input_buffer[51]*256>1500)?1500:((uint8_t)input_buffer[50]+(uint8_t)input_buffer[51]*256);
-
-                    // Battery
-                    batteryRaw = (uint8_t)input_buffer[52]+(uint8_t)input_buffer[53]*256;
-                    memset(batteryRawStr, 0x0, 5);
-                    sprintf(batteryRawStr, "%d", batteryRaw);
-
-                    // Gyro
-                    gyroRaw[0] = input_buffer[54]+input_buffer[55]*256;
-                    gyroRaw[1] = input_buffer[56]+input_buffer[57]*256;
-                    gyroRaw[2] = input_buffer[58]+input_buffer[59]*256;
-
                     // ToF
-                    distanceCm = (uint16_t)(((uint8_t)input_buffer[61]<<8)|((uint8_t)input_buffer[60]))/10;
+                    distanceCm = (uint16_t)(((uint8_t)input_buffer[64]<<8)|((uint8_t)input_buffer[63]))/10;
                     memset(distanceCmStr, 0x0, 5);
                     sprintf(distanceCmStr, "%d", (distanceCm>200)?200:distanceCm);
 
+                    // Microphone
+                    micVolume[0] = ((uint8_t)input_buffer[65]+(uint8_t)input_buffer[66]*256>1500)?1500:((uint8_t)input_buffer[65]+(uint8_t)input_buffer[66]*256);
+                    micVolume[1] = ((uint8_t)input_buffer[67]+(uint8_t)input_buffer[68]*256>1500)?1500:((uint8_t)input_buffer[67]+(uint8_t)input_buffer[68]*256);
+                    micVolume[2] = ((uint8_t)input_buffer[69]+(uint8_t)input_buffer[70]*256>1500)?1500:((uint8_t)input_buffer[69]+(uint8_t)input_buffer[70]*256);
+                    micVolume[3] = ((uint8_t)input_buffer[71]+(uint8_t)input_buffer[72]*256>1500)?1500:((uint8_t)input_buffer[71]+(uint8_t)input_buffer[72]*256);
+
+                    // Left steps
+                    leftSteps = (input_buffer[73]+input_buffer[74]*256);
+
+                    // Right steps
+                    rightSteps = (input_buffer[75]+input_buffer[76]*256);
+
+                    // Battery
+                    batteryRaw = (uint8_t)input_buffer[77]+(uint8_t)input_buffer[78]*256;
+                    memset(batteryRawStr, 0x0, 5);
+                    sprintf(batteryRawStr, "%d", batteryRaw);
+
                     // Micro sd state.
-                    microSdState = input_buffer[62];
+                    microSdState = input_buffer[79];
+
+                    // Tv remote.
+                    irCheck = input_buffer[80];
+                    irAddress = input_buffer[81];
+                    irData = input_buffer[82];
+                    memset(irCheckStr, 0x0, 8);
+                    memset(irAddressStr, 0x0, 8);
+                    memset(irDataStr, 0x0, 8);
+                    sprintf(irCheckStr, "%x", irCheck);
+                    sprintf(irAddressStr, "%x", irAddress);
+                    sprintf(irDataStr, "%x", irData);
+
+                    // Selector.
+                    selector = input_buffer[83];
+                    memset(selectorStr, 0x0, 3);
+                    sprintf(selectorStr, "%d", selector);
+
+                    // Ground sensor proximity.
+                    groundProx[0] = input_buffer[84]+input_buffer[85]*256;
+                    groundProx[1] = input_buffer[86]+input_buffer[87]*256;
+                    groundProx[2] = input_buffer[88]+input_buffer[89]*256;
+
+                    // Ground sensor ambient light.
+                    groundAmbient[0] = input_buffer[90]+input_buffer[91]*256;
+                    groundAmbient[1] = input_buffer[92]+input_buffer[93]*256;
+                    groundAmbient[2] = input_buffer[94]+input_buffer[95]*256;
 
                     // Button state.
-                    buttonState = input_buffer[63];
+                    buttonState = input_buffer[96];
 
                     sensors_count++;
                     emit newBinaryData();
@@ -275,6 +329,7 @@ void CommThread::readyRead()
                         output_buffer[1] = next_request;
                         //qDebug() << "next req 2 = " << next_request;
                         socket->write((char*)&output_buffer[0], OUTPUT_BUFFER_SIZE);
+                        output_buffer[20] = 0; // Clear sound value.
                     }
                     read_state = 0;
                 }
@@ -349,286 +404,254 @@ void CommThread::updateParameters(int t, int w, int h, int z) {
 void CommThread::goForward() {
     //qDebug() << "go fw";
     int speed_left = motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
+    output_buffer[3] = speed_left & 0xFF;
+    output_buffer[4] = (speed_left>>8) & 0xFF;
     int speed_right = motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
+    output_buffer[5] = speed_right & 0xFF;
+    output_buffer[6] = (speed_right>>8) & 0xFF;
     send_cmd = true;
 }
 
 void CommThread::goBackward() {
     //qDebug() << "go bw";
     int speed_left = -motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
+    output_buffer[3] = speed_left & 0xFF;
+    output_buffer[4] = (speed_left>>8) & 0xFF;
     int speed_right = -motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
+    output_buffer[5] = speed_right & 0xFF;
+    output_buffer[6] = (speed_right>>8) & 0xFF;
     send_cmd = true;
 }
 
 void CommThread::goLeft() {
     //qDebug() << "go sx";
     int speed_left = -motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
+    output_buffer[3] = speed_left & 0xFF;
+    output_buffer[4] = (speed_left>>8) & 0xFF;
     int speed_right = motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
+    output_buffer[5] = speed_right & 0xFF;
+    output_buffer[6] = (speed_right>>8) & 0xFF;
     send_cmd = true;
 }
 
 void CommThread::goRight() {
     //qDebug() << "go dx";
     int speed_left = motorSpeed;
-    output_buffer[2] = speed_left & 0xFF;
-    output_buffer[3] = (speed_left>>8) & 0xFF;
+    output_buffer[3] = speed_left & 0xFF;
+    output_buffer[4] = (speed_left>>8) & 0xFF;
     int speed_right = -motorSpeed;
-    output_buffer[4] = speed_right & 0xFF;
-    output_buffer[5] = (speed_right>>8) & 0xFF;
+    output_buffer[5] = speed_right & 0xFF;
+    output_buffer[6] = (speed_right>>8) & 0xFF;
     send_cmd = true;
 }
 
 void CommThread::stopMotors() {
     //qDebug() << "stop";
-    output_buffer[2] = 0;
     output_buffer[3] = 0;
     output_buffer[4] = 0;
     output_buffer[5] = 0;
+    output_buffer[6] = 0;
     send_cmd = true;
 }
 
 void CommThread::led0Slot(int state) {
     if(state == Qt::Checked) {
-        output_buffer[6] = 1;
+        output_buffer[7] |= 0x01;
     } else {
-        output_buffer[6] = 0;
+        output_buffer[7] &= ~(0x01);
     }
     send_cmd = true;
 }
 
 void CommThread::led1Slot(int state) {
-//    uint8_t bytesToSend = 0;
-//    memset(command, 0x0, 20);
-//
-//    if(state == Qt::Checked) {
-//        rgbLedState[0] = rgbLedValue[0];
-//        rgbLedState[1] = rgbLedValue[1];
-//        rgbLedState[2] = rgbLedValue[2];
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 1, 1, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    } else {
-//        rgbLedState[0] = 0;
-//        rgbLedState[1] = 0;
-//        rgbLedState[2] = 0;
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 1, 0, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    }
-
-//    comm->writeData(command, bytesToSend, 12000);
+    rgbLedState[0] = state;
+    if(state == Qt::Checked) {
+        output_buffer[8] = rgbLedValue[0];
+        output_buffer[9] = rgbLedValue[1];
+        output_buffer[10] = rgbLedValue[2];
+    } else {
+        output_buffer[8] = 0;
+        output_buffer[9] = 0;
+        output_buffer[10] = 0;
+    }
+    send_cmd = true;
 }
 
 void CommThread::led2Slot(int state) {
     if(state == Qt::Checked) {
-        output_buffer[7] = 1;
+        output_buffer[7] |= 0x02;
     } else {
-        output_buffer[7] = 0;
+        output_buffer[7] &= ~(0x02);
     }
     send_cmd = true;
 }
 
 void CommThread::led3Slot(int state) {
-//    uint8_t bytesToSend = 0;
-//    memset(command, 0x0, 20);
-
-//    if(state == Qt::Checked) {
-//        rgbLedState[3] = rgbLedValue[0];
-//        rgbLedState[4] = rgbLedValue[1];
-//        rgbLedState[5] = rgbLedValue[2];
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 3, 1, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    } else {
-//        rgbLedState[3] = 0;
-//        rgbLedState[4] = 0;
-//        rgbLedState[5] = 0;
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 3, 0, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    }
-
-//    comm->writeData(command, bytesToSend, 12000);
+    rgbLedState[1] = state;
+    if(state == Qt::Checked) {
+        output_buffer[11] = rgbLedValue[0];
+        output_buffer[12] = rgbLedValue[1];
+        output_buffer[13] = rgbLedValue[2];
+    } else {
+        output_buffer[11] = 0;
+        output_buffer[12] = 0;
+        output_buffer[13] = 0;
+    }
+    send_cmd = true;
 }
 
 void CommThread::led4Slot(int state) {
     if(state == Qt::Checked) {
-        output_buffer[8] = 1;
+        output_buffer[7] |= 0x04;
     } else {
-        output_buffer[8] = 0;
+        output_buffer[7] &= ~(0x04);
     }
     send_cmd = true;
 }
 
 void CommThread::led5Slot(int state) {
-//    uint8_t bytesToSend = 0;
-//    memset(command, 0x0, 20);
-
-//    if(state == Qt::Checked) {
-//        rgbLedState[6] = rgbLedValue[0];
-//        rgbLedState[7] = rgbLedValue[1];
-//        rgbLedState[8] = rgbLedValue[2];
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 5, 1, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    } else {
-//        rgbLedState[6] = 0;
-//        rgbLedState[7] = 0;
-//        rgbLedState[8] = 0;
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 5, 0, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    }
-
-//    comm->writeData(command, bytesToSend, 12000);
+    rgbLedState[2] = state;
+    if(state == Qt::Checked) {
+        output_buffer[14] = rgbLedValue[0];
+        output_buffer[15] = rgbLedValue[1];
+        output_buffer[16] = rgbLedValue[2];
+    } else {
+        output_buffer[14] = 0;
+        output_buffer[15] = 0;
+        output_buffer[16] = 0;
+    }
+    send_cmd = true;
 }
 
 void CommThread::led6Slot(int state) {
     if(state == Qt::Checked) {
-        //output_buffer[...] = 1;
+        output_buffer[7] |= 0x08;
     } else {
-        //output_buffer[...] = 0;
+        output_buffer[7] &= ~(0x08);
     }
     send_cmd = true;
 }
 
 void CommThread::led7Slot(int state) {
-//    uint8_t bytesToSend = 0;
-//    memset(command, 0x0, 20);
-
-//    if(state == Qt::Checked) {
-//        rgbLedState[9] = rgbLedValue[0];
-//        rgbLedState[10] = rgbLedValue[1];
-//        rgbLedState[11] = rgbLedValue[2];
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 7, 1, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    } else {
-//        rgbLedState[9] = 0;
-//        rgbLedState[10] = 0;
-//        rgbLedState[11] = 0;
-//        if((int)asercomVer == 1) {
-//            bytesToSend = 4;
-//            sprintf(command, "%c%c%c%c",-'L', 7, 0, 0);
-//        } else {
-//            bytesToSend = 13;
-//            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-//        }
-//    }
-
-//    comm->writeData(command, bytesToSend, 12000);
+    rgbLedState[3] = state;
+    if(state == Qt::Checked) {
+        output_buffer[17] = rgbLedValue[0];
+        output_buffer[18] = rgbLedValue[1];
+        output_buffer[19] = rgbLedValue[2];
+    } else {
+        output_buffer[17] = 0;
+        output_buffer[18] = 0;
+        output_buffer[19] = 0;
+    }
+    send_cmd = true;
 }
 
 void CommThread::led8Slot(int state) {
     if(state == Qt::Checked) {
-        //output_buffer[...] = 1;
+        output_buffer[7] |= 0x10;
     } else {
-        //output_buffer[...] = 0;
+        output_buffer[7] &= ~(0x10);
     }
     send_cmd = true;
 }
 
 void CommThread::led9Slot(int state) {
     if(state == Qt::Checked) {
-        //output_buffer[...] = 1;
+        output_buffer[7] |= 0x20;
     } else {
-        //output_buffer[...] = 0;
+        output_buffer[7] &= ~(0x20);
     }
     send_cmd = true;
 }
 
 void CommThread::sound1Slot() {
-    //output_buffer[...] = 1;
+    output_buffer[20] |= 0x01;
     send_cmd = true;
 }
 
 void CommThread::sound2Slot() {
-    //output_buffer[...] = 2;
+    output_buffer[20] |= 0x02;
     send_cmd = true;
 }
 
 void CommThread::sound3Slot() {
-    //output_buffer[...] = 3;
+    output_buffer[20] |= 0x04;
     send_cmd = true;
 }
 
 void CommThread::sound4Slot() {
-    //output_buffer[...] = 4;
+    output_buffer[20] |= 0x08;
     send_cmd = true;
 }
 
 void CommThread::sound5Slot() {
-    //output_buffer[...] = 5;
+    output_buffer[20] |= 0x10;
     send_cmd = true;
 }
 
 void CommThread::audioOffSlot() {
-    //output_buffer[...] = 6;
+    output_buffer[20] |= 0x20;
     send_cmd = true;
 }
 
 void CommThread::updateRed(int value) {
     rgbLedValue[0] = value;
-    //updateLed1Now = true;
-    //updateLed3Now = true;
-    //updateLed5Now = true;
-    //updateLed7Now = true;
+    if(rgbLedState[0] == Qt::Checked) {
+        output_buffer[8] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[1] == Qt::Checked) {
+        output_buffer[11] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[2] == Qt::Checked) {
+        output_buffer[14] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[3] == Qt::Checked) {
+        output_buffer[17] = value;
+        send_cmd = true;
+    }
 }
 
 void CommThread::updateGreen(int value) {
     rgbLedValue[1] = value;
-    //updateLed1Now = true;
-    //updateLed3Now = true;
-    //updateLed5Now = true;
-    //updateLed7Now = true;
+    if(rgbLedState[0] == Qt::Checked) {
+        output_buffer[9] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[1] == Qt::Checked) {
+        output_buffer[12] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[2] == Qt::Checked) {
+        output_buffer[15] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[3] == Qt::Checked) {
+        output_buffer[18] = value;
+        send_cmd = true;
+    }
 }
 
 void CommThread::updateBlue(int value) {
     rgbLedValue[2] = value;
-    //updateLed1Now = true;
-    //updateLed3Now = true;
-    //updateLed5Now = true;
-    //updateLed7Now = true;
+    if(rgbLedState[0] == Qt::Checked) {
+        output_buffer[10] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[1] == Qt::Checked) {
+        output_buffer[13] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[2] == Qt::Checked) {
+        output_buffer[16] = value;
+        send_cmd = true;
+    }
+    if(rgbLedState[3] == Qt::Checked) {
+        output_buffer[19] = value;
+        send_cmd = true;
+    }
 }
 
 
