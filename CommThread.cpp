@@ -169,23 +169,31 @@ void CommThread::readyRead()
                     //    qDebug() << std::dec << (int)input_buffer[i] << ", ";
                     //}
 
+                    acc_x = input_buffer[0] + input_buffer[1]*256;
+                    acc_y = input_buffer[2] + input_buffer[3]*256;
+                    acc_z = input_buffer[4] + input_buffer[5]*256;
+
+                    //qDebug() << "acc_x = " << acc_x;
+                    //qDebug() << "acc_y = " << acc_y;
+                    //qDebug() << "acc_z = " << acc_z;
+
                     long  mantis=0;
                     short  exp=0;
                     float flt=0;
 
                     // Compute acceleration
-                    mantis = (input_buffer[0] & 0xff) + ((input_buffer[1] & 0xffl) << 8) + (((input_buffer[2] &0x7fl) | 0x80) << 16);
-                    exp = (input_buffer[3] & 0x7f) * 2 + ((input_buffer[2] & 0x80) ? 1 : 0);
-                    if (input_buffer[3] & 0x80) {
+                    mantis = (input_buffer[6] & 0xff) + ((input_buffer[7] & 0xffl) << 8) + (((input_buffer[8] &0x7fl) | 0x80) << 16);
+                    exp = (input_buffer[9] & 0x7f) * 2 + ((input_buffer[8] & 0x80) ? 1 : 0);
+                    if (input_buffer[9] & 0x80) {
                         mantis = -mantis;
                     }
                     flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
                     acceleration=flt;
 
                     // Compute orientation.
-                    mantis = (input_buffer[4] & 0xff) + ((input_buffer[5] & 0xffl) << 8) + (((input_buffer[6] &0x7fl) | 0x80) << 16);
-                    exp = (input_buffer[7] & 0x7f) * 2 + ((input_buffer[6] & 0x80) ? 1 : 0);
-                    if (input_buffer[7] & 0x80)
+                    mantis = (input_buffer[10] & 0xff) + ((input_buffer[11] & 0xffl) << 8) + (((input_buffer[12] &0x7fl) | 0x80) << 16);
+                    exp = (input_buffer[13] & 0x7f) * 2 + ((input_buffer[12] & 0x80) ? 1 : 0);
+                    if (input_buffer[13] & 0x80)
                         mantis = -mantis;
                     flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
                     orientation=flt;
@@ -194,10 +202,12 @@ void CommThread::readyRead()
                     if (orientation > 360.0 )
                         orientation=360.0;
 
+                    //qDebug() << "orientation = " << orientation;
+
                     // Compute inclination.
-                    mantis = (input_buffer[8] & 0xff) + ((input_buffer[9] & 0xffl) << 8) + (((input_buffer[10] &0x7fl) | 0x80) << 16);
-                    exp = (input_buffer[11] & 0x7f) * 2 + ((input_buffer[10] & 0x80) ? 1 : 0);
-                    if (input_buffer[11] & 0x80)
+                    mantis = (input_buffer[14] & 0xff) + ((input_buffer[15] & 0xffl) << 8) + (((input_buffer[16] &0x7fl) | 0x80) << 16);
+                    exp = (input_buffer[17] & 0x7f) * 2 + ((input_buffer[16] & 0x80) ? 1 : 0);
+                    if (input_buffer[17] & 0x80)
                         mantis = -mantis;
                     flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
                     inclination=flt;
@@ -206,28 +216,30 @@ void CommThread::readyRead()
                     if (inclination > 180.0 )
                         inclination=180.0;
 
+                    //qDebug() << "inclination = " << inclination;
+
                     // Gyro
-                    gyroRaw[0] = input_buffer[12]+input_buffer[13]*256;
-                    gyroRaw[1] = input_buffer[14]+input_buffer[15]*256;
-                    gyroRaw[2] = input_buffer[16]+input_buffer[17]*256;
+                    gyroRaw[0] = input_buffer[18]+input_buffer[19]*256;
+                    gyroRaw[1] = input_buffer[20]+input_buffer[21]*256;
+                    gyroRaw[2] = input_buffer[22]+input_buffer[23]*256;
 
                     // Magnetometer
-                    magneticField[0] = *((float*)&input_buffer[18]);
-                    magneticField[1] = *((float*)&input_buffer[22]);
-                    magneticField[2] = *((float*)&input_buffer[26]);
+                    magneticField[0] = *((float*)&input_buffer[24]);
+                    magneticField[1] = *((float*)&input_buffer[28]);
+                    magneticField[2] = *((float*)&input_buffer[32]);
 
                     // Temperature.
-                    temperature = input_buffer[30];
+                    temperature = input_buffer[36];
 
                     // Proximity sensors data.
-                    ir0 = (input_buffer[31]+input_buffer[32]*256>2000)?2000:input_buffer[31]+input_buffer[32]*256;
-                    ir1 = (input_buffer[33]+input_buffer[34]*256>2000)?2000:input_buffer[33]+input_buffer[34]*256;
-                    ir2 = (input_buffer[35]+input_buffer[36]*256>2000)?2000:input_buffer[35]+input_buffer[36]*256;
-                    ir3 = (input_buffer[37]+input_buffer[38]*256>2000)?2000:input_buffer[37]+input_buffer[38]*256;
-                    ir4 = (input_buffer[39]+input_buffer[40]*256>2000)?2000:input_buffer[39]+input_buffer[40]*256;
-                    ir5 = (input_buffer[41]+input_buffer[42]*256>2000)?2000:input_buffer[41]+input_buffer[42]*256;
-                    ir6 = (input_buffer[43]+input_buffer[44]*256>2000)?2000:input_buffer[43]+input_buffer[44]*256;
-                    ir7 = (input_buffer[45]+input_buffer[46]*256>2000)?2000:input_buffer[45]+input_buffer[46]*256;
+                    ir0 = (input_buffer[37]+input_buffer[38]*256>2000)?2000:input_buffer[37]+input_buffer[38]*256;
+                    ir1 = (input_buffer[39]+input_buffer[40]*256>2000)?2000:input_buffer[39]+input_buffer[40]*256;
+                    ir2 = (input_buffer[41]+input_buffer[42]*256>2000)?2000:input_buffer[41]+input_buffer[42]*256;
+                    ir3 = (input_buffer[43]+input_buffer[44]*256>2000)?2000:input_buffer[43]+input_buffer[44]*256;
+                    ir4 = (input_buffer[45]+input_buffer[46]*256>2000)?2000:input_buffer[45]+input_buffer[46]*256;
+                    ir5 = (input_buffer[47]+input_buffer[48]*256>2000)?2000:input_buffer[47]+input_buffer[48]*256;
+                    ir6 = (input_buffer[49]+input_buffer[50]*256>2000)?2000:input_buffer[49]+input_buffer[50]*256;
+                    ir7 = (input_buffer[51]+input_buffer[52]*256>2000)?2000:input_buffer[51]+input_buffer[52]*256;
                     if(ir0<0) {
                         ir0=0;
                     }
@@ -254,14 +266,14 @@ void CommThread::readyRead()
                     }
 
                     // Compute abmient light.
-                    lightAvg += (input_buffer[47]+input_buffer[48]*256);
-                    lightAvg += (input_buffer[49]+input_buffer[50]*256);
-                    lightAvg += (input_buffer[51]+input_buffer[52]*256);
                     lightAvg += (input_buffer[53]+input_buffer[54]*256);
                     lightAvg += (input_buffer[55]+input_buffer[56]*256);
                     lightAvg += (input_buffer[57]+input_buffer[58]*256);
                     lightAvg += (input_buffer[59]+input_buffer[60]*256);
                     lightAvg += (input_buffer[61]+input_buffer[62]*256);
+                    lightAvg += (input_buffer[63]+input_buffer[64]*256);
+                    lightAvg += (input_buffer[65]+input_buffer[66]*256);
+                    lightAvg += (input_buffer[67]+input_buffer[68]*256);
                     lightAvg = (int) (lightAvg/8);
                     lightAvg = (lightAvg>4000)?4000:lightAvg;
                     if(lightAvg<0) {
@@ -269,34 +281,34 @@ void CommThread::readyRead()
                     }
 
                     // ToF
-                    distanceCm = (uint16_t)(((uint8_t)input_buffer[64]<<8)|((uint8_t)input_buffer[63]))/10;
+                    distanceCm = (uint16_t)(((uint8_t)input_buffer[70]<<8)|((uint8_t)input_buffer[69]))/10;
                     memset(distanceCmStr, 0x0, 5);
                     sprintf(distanceCmStr, "%d", (distanceCm>200)?200:distanceCm);
 
                     // Microphone
-                    micVolume[0] = ((uint8_t)input_buffer[65]+(uint8_t)input_buffer[66]*256>1500)?1500:((uint8_t)input_buffer[65]+(uint8_t)input_buffer[66]*256);
-                    micVolume[1] = ((uint8_t)input_buffer[67]+(uint8_t)input_buffer[68]*256>1500)?1500:((uint8_t)input_buffer[67]+(uint8_t)input_buffer[68]*256);
-                    micVolume[2] = ((uint8_t)input_buffer[69]+(uint8_t)input_buffer[70]*256>1500)?1500:((uint8_t)input_buffer[69]+(uint8_t)input_buffer[70]*256);
-                    micVolume[3] = ((uint8_t)input_buffer[71]+(uint8_t)input_buffer[72]*256>1500)?1500:((uint8_t)input_buffer[71]+(uint8_t)input_buffer[72]*256);
+                    micVolume[0] = ((uint8_t)input_buffer[71]+(uint8_t)input_buffer[72]*256>1500)?1500:((uint8_t)input_buffer[71]+(uint8_t)input_buffer[72]*256);
+                    micVolume[1] = ((uint8_t)input_buffer[73]+(uint8_t)input_buffer[74]*256>1500)?1500:((uint8_t)input_buffer[73]+(uint8_t)input_buffer[74]*256);
+                    micVolume[2] = ((uint8_t)input_buffer[75]+(uint8_t)input_buffer[76]*256>1500)?1500:((uint8_t)input_buffer[75]+(uint8_t)input_buffer[76]*256);
+                    micVolume[3] = ((uint8_t)input_buffer[77]+(uint8_t)input_buffer[78]*256>1500)?1500:((uint8_t)input_buffer[77]+(uint8_t)input_buffer[78]*256);
 
                     // Left steps
-                    leftSteps = (input_buffer[73]+input_buffer[74]*256);
+                    leftSteps = (input_buffer[79]+input_buffer[80]*256);
 
                     // Right steps
-                    rightSteps = (input_buffer[75]+input_buffer[76]*256);
+                    rightSteps = (input_buffer[81]+input_buffer[82]*256);
 
                     // Battery
-                    batteryRaw = (uint8_t)input_buffer[77]+(uint8_t)input_buffer[78]*256;
+                    batteryRaw = (uint8_t)input_buffer[83]+(uint8_t)input_buffer[84]*256;
                     memset(batteryRawStr, 0x0, 5);
                     sprintf(batteryRawStr, "%d", batteryRaw);
 
                     // Micro sd state.
-                    microSdState = input_buffer[79];
+                    microSdState = input_buffer[85];
 
                     // Tv remote.
-                    irCheck = input_buffer[80];
-                    irAddress = input_buffer[81];
-                    irData = input_buffer[82];
+                    irCheck = input_buffer[86];
+                    irAddress = input_buffer[87];
+                    irData = input_buffer[88];
                     memset(irCheckStr, 0x0, 8);
                     memset(irAddressStr, 0x0, 8);
                     memset(irDataStr, 0x0, 8);
@@ -305,22 +317,22 @@ void CommThread::readyRead()
                     sprintf(irDataStr, "%x", irData);
 
                     // Selector.
-                    selector = input_buffer[83];
+                    selector = input_buffer[89];
                     memset(selectorStr, 0x0, 3);
                     sprintf(selectorStr, "%d", selector);
 
                     // Ground sensor proximity.
-                    groundProx[0] = input_buffer[84]+input_buffer[85]*256;
-                    groundProx[1] = input_buffer[86]+input_buffer[87]*256;
-                    groundProx[2] = input_buffer[88]+input_buffer[89]*256;
+                    groundProx[0] = input_buffer[90]+input_buffer[91]*256;
+                    groundProx[1] = input_buffer[92]+input_buffer[93]*256;
+                    groundProx[2] = input_buffer[94]+input_buffer[95]*256;
 
                     // Ground sensor ambient light.
-                    groundAmbient[0] = input_buffer[90]+input_buffer[91]*256;
-                    groundAmbient[1] = input_buffer[92]+input_buffer[93]*256;
-                    groundAmbient[2] = input_buffer[94]+input_buffer[95]*256;
+                    groundAmbient[0] = input_buffer[96]+input_buffer[97]*256;
+                    groundAmbient[1] = input_buffer[98]+input_buffer[99]*256;
+                    groundAmbient[2] = input_buffer[100]+input_buffer[101]*256;
 
                     // Button state.
-                    buttonState = input_buffer[96];
+                    buttonState = input_buffer[102];
 
                     sensors_count++;
                     emit newBinaryData();
