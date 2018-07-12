@@ -169,10 +169,9 @@ void CommThread::readyRead()
                     //    qDebug() << std::dec << (int)input_buffer[i] << ", ";
                     //}
 
-                    acc_x = input_buffer[0] + input_buffer[1]*256;
-                    acc_y = input_buffer[2] + input_buffer[3]*256;
-                    acc_z = input_buffer[4] + input_buffer[5]*256;
-
+                    //acc_x = input_buffer[0] + input_buffer[1]*256;
+                    //acc_y = input_buffer[2] + input_buffer[3]*256;
+                    //acc_z = input_buffer[4] + input_buffer[5]*256;
                     //qDebug() << "acc_x = " << acc_x;
                     //qDebug() << "acc_y = " << acc_y;
                     //qDebug() << "acc_z = " << acc_z;
@@ -229,7 +228,8 @@ void CommThread::readyRead()
                     magneticField[2] = *((float*)&input_buffer[32]);
 
                     // Temperature.
-                    temperature = input_buffer[36];
+                    //temperature = input_buffer[36];
+                    //qDebug() << "temp = " << temperature;
 
                     // Proximity sensors data.
                     ir0 = (input_buffer[37]+input_buffer[38]*256>2000)?2000:input_buffer[37]+input_buffer[38]*256;
@@ -292,10 +292,11 @@ void CommThread::readyRead()
                     micVolume[3] = ((uint8_t)input_buffer[77]+(uint8_t)input_buffer[78]*256>1500)?1500:((uint8_t)input_buffer[77]+(uint8_t)input_buffer[78]*256);
 
                     // Left steps
-                    leftSteps = (input_buffer[79]+input_buffer[80]*256);
+                    //leftSteps = (input_buffer[79]+input_buffer[80]*256);
+                    //qDebug() << "left steps = " << leftSteps;
 
                     // Right steps
-                    rightSteps = (input_buffer[81]+input_buffer[82]*256);
+                    //rightSteps = (input_buffer[81]+input_buffer[82]*256);
 
                     // Battery
                     batteryRaw = (uint8_t)input_buffer[83]+(uint8_t)input_buffer[84]*256;
@@ -322,14 +323,14 @@ void CommThread::readyRead()
                     sprintf(selectorStr, "%d", selector);
 
                     // Ground sensor proximity.
-                    groundProx[0] = input_buffer[90]+input_buffer[91]*256;
-                    groundProx[1] = input_buffer[92]+input_buffer[93]*256;
-                    groundProx[2] = input_buffer[94]+input_buffer[95]*256;
+                    //groundProx[0] = input_buffer[90]+input_buffer[91]*256;
+                    //groundProx[1] = input_buffer[92]+input_buffer[93]*256;
+                    //groundProx[2] = input_buffer[94]+input_buffer[95]*256;
 
                     // Ground sensor ambient light.
-                    groundAmbient[0] = input_buffer[96]+input_buffer[97]*256;
-                    groundAmbient[1] = input_buffer[98]+input_buffer[99]*256;
-                    groundAmbient[2] = input_buffer[100]+input_buffer[101]*256;
+                    //groundAmbient[0] = input_buffer[96]+input_buffer[97]*256;
+                    //groundAmbient[1] = input_buffer[98]+input_buffer[99]*256;
+                    //groundAmbient[2] = input_buffer[100]+input_buffer[101]*256;
 
                     // Button state.
                     buttonState = input_buffer[102];

@@ -970,7 +970,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED_RGB5</string>
+      <string>LED6_RGB</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed6">
@@ -983,7 +983,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED6</string>
+      <string>LED7</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed2">
@@ -996,7 +996,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED2</string>
+      <string>LED3</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed0">
@@ -1009,7 +1009,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED0</string>
+      <string>LED1</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed8">
@@ -1022,7 +1022,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>BODY_LED8</string>
+      <string>BODY_LED</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed3">
@@ -1035,7 +1035,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED_RGB3</string>
+      <string>LED4_RGB</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed1">
@@ -1048,7 +1048,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED_RGB1</string>
+      <string>LED2_RGB</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed9">
@@ -1061,7 +1061,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>FRONT_LED9</string>
+      <string>FRONT_LED</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed7">
@@ -1074,7 +1074,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED_RGB7</string>
+      <string>LED8_RGB</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkLed4">
@@ -1087,7 +1087,7 @@ QGroupBox::title {
       </rect>
      </property>
      <property name="text">
-      <string>LED4</string>
+      <string>LED5</string>
      </property>
     </widget>
     <widget class="QSlider" name="slideRed">

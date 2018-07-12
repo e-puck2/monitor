@@ -141,7 +141,7 @@ class CommThread : public QObject
         int rgbLedState[4];
         char selectorStr[3];
         char irCheckStr[8], irAddressStr[8], irDataStr[8];
-        int acc_x, acc_y, acc_z;
+        int16_t acc_x, acc_y, acc_z;
 
 
         unsigned int type;						/**< type of the image: color (value 1) or grayscale (value 0)*/

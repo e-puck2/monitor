@@ -350,7 +350,6 @@ void EpuckMonitor::printMessage(QString s) {
 void EpuckMonitor::setCommThread(CommThread *thread) {
     commThread = thread;
     QObject::connect(commThread, SIGNAL(newBinaryData()), this, SLOT(binarySensorsUpdate()));
-    QObject::connect(commThread, SIGNAL(newAsciiData()), this, SLOT(asciiSensorsUpdate()));
     QObject::connect(commThread, SIGNAL(newImage()), this, SLOT(cameraUpdate()));
     commThread->setSpeed(motorSpeed);
 }
