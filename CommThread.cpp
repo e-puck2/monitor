@@ -35,853 +35,748 @@ void CommThread::init() {
     zoom = 8;
     getSensorsData = true;
     getCameraData = false;
-    goUpNow = false; goDownNow = false; goLeftNow = false; goRightNow = false; stopNow = false;
-    updateLed0Now = false; updateLed1Now = false; updateLed2Now = false; updateLed3Now = false; updateLed4Now = false; updateLed5Now = false; updateLed6Now = false; updateLed7Now = false; updateLed8Now = false; updateLed9Now = false;
-    sound1Now = false; sound2Now = false; sound3Now = false; sound4Now = false; sound5Now = false; audioOffNow = false;
-    comm = NULL;    
+    motorSpeed = 500;
+    memset(command_sensors, 0x00, 20);
+    memset(command_cam, 0x00, 20);
+    command_cam[0]=-'I';      //binary image receiving command
+    command_cam[1]= 0;        //end command
+    conn_trials = 0;
+
+    m_timer.setSingleShot(true);
+    connect(&m_timer, SIGNAL(timeout()), this, SLOT(handleTimeout()));
+
+    serialPort = new QSerialPort(this);
+    connect(serialPort, SIGNAL(bytesWritten(qint64)), this,  SLOT(handleBytesWritten(qint64)));
+    connect(serialPort, SIGNAL(errorOccurred(QSerialPort::SerialPortError)), this, SLOT(handleError(QSerialPort::SerialPortError)));
+    connect(serialPort, SIGNAL(readyRead()),this, SLOT(readyRead()));
 }
 
 void CommThread::initConnection(char* portName) {
+    read_state = 0;
+    packet_index = 0;
+
     memset(this->portName, 0x0, 50);
     memcpy(this->portName, portName, strlen(portName));
 
+    serialPort->setPortName(this->portName);
+    serialPort->setBaudRate(QSerialPort::Baud115200);
 
-
-
-
-    char version[100];
-    int err = 0;
-    //QSerialPort serialPort;
-
-#ifdef __WIN32__
-
-    comm = new TCommPort();
-    comm->SetCommPort(portName);
-    comm->SetBaudRate(115200);
-    comm->SetParity(NOPARITY);      // NOPARITY and friends are #defined in windows.h
-    comm->SetByteSize(8);
-    comm->SetStopBits(ONESTOPBIT);  // ONESTOPBIT is also from windows.h
-    err = comm->OpenCommPort();
-    if(err==-1) {
-        std::cerr << "Unable to open serial port." << std::endl;
-        emit cannotOpenPort("Unable to open serial port.");
-        emit portClosed();
-        return;
-    }
-    emit portOpened();
-
-    comm->WriteBuffer((BYTE*)"\r", 1);
-    comm->FlushCommPort();
-    Sleep(100);
-    comm->PurgeCommPort();
-
-    sprintf(command, "V\r");
-    comm->WriteBuffer((BYTE*)command, 2);
-    memset(version, 0x0, 100);
-    comm->ReadBytes((BYTE*)version, 36, 200000);
-    emit showVersion(&version[2], 0);
-
-#else
-    serialPort.setPortName(this->portName);
-    serialPort.setBaudRate(QSerialPort::Baud115200);
-
-    if (!serialPort.open(QIODevice::ReadWrite)) {
-        std::cerr << "Unable to open serial port " << portName << " (err = " << serialPort.error() << std::endl;
-        emit cannotOpenPort("Unable to open serial port.");
-        emit portClosed();
+    if (!serialPort->open(QIODevice::ReadWrite)) {
+        std::cerr << "Unable to open serial port " << portName << " (err = " << serialPort->error() << ")" << std::endl;
+        emit printDialog("Unable to open serial port.");
+        closeCommunication(false, false); // Do not reconnect
         return;
     }
 
-    usleep(10000);
-    serialPort.clear(QSerialPort::AllDirections);
+    serialPort->clear(QSerialPort::AllDirections);
 
     memset(command, 0x0, 20);
-    sprintf(command, "\r");
-    serialPort.write(command, 1);        // clear output buffer
-    usleep(10000);
-    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-        serialPort.read(version, 100);
-    } else {
-        std::cerr << "Error reading" << std::endl;
-        emit portClosed();
-        //return;
-    }
+    sprintf(command, "x\r");
+    serialPort->write(command, 2); // Send a fake request to clear the communication with the robot
+    //serialPort->flush();
+    //serialPort->waitForBytesWritten(-1);
+    std::cerr << "Clearing the communication" << std::endl;
+    conn_state = 0; // Clearing communication
+    m_timer.start(TIMEOUT_MS);
 
-    //serialPort.clear(QSerialPort::AllDirections);
-
-    sprintf(command, "V\r");
-    serialPort.write(command, 2);
-    usleep(10000);
-    memset(version, 0x0, 100);
-    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-        serialPort.read(version, 100);
-    } else {
-        std::cerr << "Error reading" << std::endl;
-        emit portClosed();
-        //return;
-    }
-    std::cerr << "version = " << version << std::endl;
-    emit showVersion(&version[2], 0);
-
-#endif
-
-    asercomVer = version[10]-'0';
-    std::cerr << "asercom version = " << (int)asercomVer << std::endl;
-
-    if(asercomVer!=1 && asercomVer!=2) {
-        std::cerr << "Unable to work with this protocol version" << std::endl;
-        closeCommunication();
-        emit reconnect();
-        return;
-    }
-
-    emit portOpened();
-
-/*
-    //initialize camera parameters
-    memset(command, 0x0, 20);
-    sprintf(command,"J,%d,%d,%d,%d\r\n", type, width, height, zoom);
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, strlen(command));
-    comm->FlushCommPort();
-    comm->ReadBytes((BYTE*)RxBuffer,3);
-    comm->FlushCommPort();
-#else
-    comm->writeData(command, strlen(command), 100000);
-    comm->readData(RxBuffer, 3, 300000);    //response is j\r\n
-#endif
-
-    std::cerr << "response = " << RxBuffer << std::endl;
-*/
-
-    getSensorsData = true;
-    getCameraData = false;
-
-
-
-
-
-
-
-
-    start();
 }
 
 CommThread::~CommThread() {
-    //if(serialPort.isOpen()) {
-    //    serialPort.close();
-    //}
+    if(serialPort->isOpen()) {
+        serialPort->clear(QSerialPort::AllDirections);
+        serialPort->close();
+    }
 }
 
-void CommThread::closeCommunication() {
-#ifdef __WIN32__
-    if(comm!=NULL) {
-        comm->FlushCommPort();
-        comm->PurgeCommPort();
-        comm->CloseCommPort();
-        comm=NULL;
+void CommThread::handleTimeout() {
+    // Actually the same procedure is done for all states, thus the states could be eliminated...
+    // At the moment the states are maintained separated in case different actions are needed for them.
+    std::cerr << "timeout occurred (" << (int)conn_state << ")" << std::endl;
+    switch(conn_state) {
+        case 0: // Clearing communication => no answer received from the robot at the beginning
+            conn_trials++;
+            if(conn_trials == MAX_CONN_TRIALS) { // The robot never answered, thus give up...
+                closeCommunication(false, false);
+                conn_trials = 0;
+            } else { // Restart the communication with the robot
+                closeCommunication(true, false);
+            }
+            break;
+        case 1: // Getting protocol version => no answer received from the robot after issueing the request
+            conn_trials++;
+            if(conn_trials == MAX_CONN_TRIALS) { // The robot never answered, thus give up...
+                closeCommunication(false, false);
+                conn_trials = 0;
+            } else { // Restart the communication with the robot
+                closeCommunication(true, false);
+            }
+            break;
+        case 2: // Getting sensors/camera data => no answer received from the robot after issueing the request
+            std::cerr << "Only " << (int)bytesRead << "/" << (int)bytesToRead << " bytes received for the previous request, restart the communication..." << std::endl;
+            for(int i=0; i<bytesRead; i++) {
+                std::cerr << (int)RxBuffer[i] << ", ";
+            }
+            std::cerr << std::endl;
+            //conn_trials++;
+            //if(conn_trials == MAX_CONN_TRIALS) { // The robot never answered, thus give up...
+            //    closeCommunication(false, false);
+            //    conn_trials = 0;
+            //} else { // Restart the communication with the robot
+                closeCommunication(true, false);
+            //}
+            break;
     }
-#else
-    if(serialPort.isOpen()) {
-        serialPort.close();
-    }
-#endif
-    emit portClosed();
 }
 
-void CommThread::run() {
-
-    char msg[50];
-    int bytes=0;
-    long  mantis=0;
-    short  exp=0;
-    float flt=0;
-    uint8_t bytesToRead = 0;
-    uint8_t bytesToSend = 0;
-    bool reconnectFlag = false;
-
-
-
-
-
-
-
-
-
-
-
-    abortThread = false;
-
-    while(!abortThread) {
-
-        msleep(20); // Keep main thread (GUI) responsive.
-
-        if(getSensorsData) {
-
-            if((int)asercomVer == 1) {
-                bytesToSend = 7;
-                command[0]=-'A';                        //accelerometer request
-                command[1]=-'N';                        //proximity sensors request
-                command[2]=-'O';                        //ambient light request
-                command[3]=-'u';                        //microphones request (3 x mic)
-                command[4]=-'b';                        // Battery raw value.
-                command[5]=-'g';                        // Gyro raw value.
-                command[6]=0;                           //binary command ending
-            } else {
-                bytesToSend = 10;
-                command[0]=-'A';                        //accelerometer request
-                command[1]=-'N';                        //proximity sensors request
-                command[2]=-'O';                        //ambient light request
-                command[3]=-0x0C;                       //microphones request (4 x mic)
-                command[4]=-'b';                        // Battery raw value.
-                command[5]=-'g';                        // Gyro raw value.
-                command[6]=-0x0D;                       // ToF sensor value.
-                command[7]=-0x0B;                       // User button state.
-                command[8]=-0x0E;                       // Micro sd state.
-                command[9]=0;                           //binary command ending
-            }
-
-            //send all the request in one shot
-        #ifdef __WIN32__
-            comm->PurgeCommPort();
-            comm->WriteBuffer((BYTE*)command, bytesToSend);
-            comm->FlushCommPort();
-            Sleep(100);
-        #else
-            //comm->flush();
-            bytes=serialPort.write(command, bytesToSend);
-        #endif
-
-            //ACCELEROMETER DATA
-/*
-            memset(RxBuffer, 0x0, 45);
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,6,1000000);
-        #else
-            bytes=comm->readData((char*)RxBuffer,6,1000000);
-        #endif
-            if(bytes<6) {
-                sprintf(msg, "Accelerometer: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                orientation=0.0;
-            } else {
-                acc_x = RxBuffer[0]+RxBuffer[1]*256;
-                acc_y = RxBuffer[2]+RxBuffer[3]*256;
-                acc_z = RxBuffer[4]+RxBuffer[5]*256;
-
-            }
-
-            std::cerr << "acc x = " << acc_x << std::endl;
-            std::cerr << "acc y = " << acc_y << std::endl;
-            std::cerr << "acc z = " << acc_z << std::endl;
-            std::cerr << "roll = " << atan2((double)acc_z,(double)acc_x)/M_PI*180.0 << std::endl;
-            std::cerr << "pitch = " << atan2((double)acc_z,(double)acc_y)/M_PI*180.0 << std::endl;
-*/
-
-
-            //read acceleration
-            memset(RxBuffer, 0x0, 45);            
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,4,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, 4);
-            } else {
-                bytes=0;
-            }
-        #endif
-            mantis=0;
-            exp=0;
-            flt=0;
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
-                break;
-            } else if(bytes<4) {	//data not received completely
-                sprintf(msg, "Acceleration: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                acceleration=0.0;
-            } else {
-                mantis = (RxBuffer[0] & 0xff) + ((RxBuffer[1] & 0xffl) << 8) + (((RxBuffer[2] &0x7fl) | 0x80) << 16);
-                exp = (RxBuffer[3] & 0x7f) * 2 + ((RxBuffer[2] & 0x80) ? 1 : 0);
-                if (RxBuffer[3] & 0x80) {
-                    mantis = -mantis;
+void CommThread::handleBytesWritten(qint64 bytes) {
+    std::cerr << "handleBytesWritten = " << bytes << std::endl;
+    //std::cerr << "cmd size = " << cmd_list.size() << std::endl;
+    //std::cerr << "answer size = " << cmd_list_need_answer.size() << std::endl;
+    //if(cmd_list_need_answer.size() > 0) {
+    if(sending_async_commands) {
+        if(cmd_list_need_answer.front()) { // The last async command need an answer
+            //read_state = 4;
+            //std::cerr << "need answer" << std::endl;
+        } else {
+            cmd_list_need_answer.erase(cmd_list_need_answer.begin());
+            cmd_list_answer_len.erase(cmd_list_answer_len.begin());
+            if(cmd_list.size() > 0) { // Continue sending async commands if needed
+                //std::cerr << "no need answer, send next command" << std::endl;
+                memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                packet_index = 0;
+                serialPort->write(cmd_list.front().c_str(), cmd_list_len.front());
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                //memcpy(temp_buffer, &cmd_list.front()[0], cmd_list_len.front());
+                //serialPort->write((char*)temp_buffer, cmd_list_len.front());
+                m_timer.start(TIMEOUT_MS);
+                cmd_list.erase(cmd_list.begin());
+                cmd_list_len.erase(cmd_list_len.begin());
+                if(cmd_list_need_answer.front()) {
+                    read_state = 4;
                 }
-                flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
-                acceleration=flt;
-            }            
-
-            //read orientation
-            memset(RxBuffer, 0x0, 45);            
-        #ifdef __WIN32__
-            bytes=serialPort.writeBytes((BYTE*)RxBuffer,4,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, 4);
-            } else {
-                bytes=0;
-            }
-        #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
-                break;
-            } else if(bytes<4) {
-                sprintf(msg, "Orientation: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                orientation=0.0;
-            } else {
-                mantis = (RxBuffer[0] & 0xff) + ((RxBuffer[1] & 0xffl) << 8) + (((RxBuffer[2] &0x7fl) | 0x80) << 16);
-                exp = (RxBuffer[3] & 0x7f) * 2 + ((RxBuffer[2] & 0x80) ? 1 : 0);
-                if (RxBuffer[3] & 0x80)
-                    mantis = -mantis;
-                flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
-                orientation=flt;
-                if (orientation < 0.0 )
-                    orientation=0.0;
-                if (orientation > 360.0 )
-                    orientation=360.0;
-            }            
-
-            //std::cout << "orientation = " << orientation << std::endl;
-
-            //read inclination
-            memset(RxBuffer, 0x0, 45);
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,4,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, 4);
-            } else {
-                bytes=0;
-            }
-        #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
-                break;
-            } else if(bytes<4) {
-                sprintf(msg, "Inclination: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                inclination=0.0;
-            } else {
-                mantis = (RxBuffer[0] & 0xff) + ((RxBuffer[1] & 0xffl) << 8) + (((RxBuffer[2] &0x7fl) | 0x80) << 16);
-                exp = (RxBuffer[3] & 0x7f) * 2 + ((RxBuffer[2] & 0x80) ? 1 : 0);
-                if (RxBuffer[3] & 0x80)
-                    mantis = -mantis;
-                flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
-                inclination=flt;
-                if (inclination < 0.0 )
-                    inclination=0.0;
-                if (inclination > 180.0 )
-                    inclination=180.0;
-            }
-            //std::cout << "inclination = " << inclination << std::endl;
-
-
-            //PROXIMITY SENSORS DATA
-            memset(RxBuffer, 0x0, 45);
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,16,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, 16);
-            } else {
-                bytes=0;
-            }
-        #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
-                break;
-            } else if(bytes<16) {
-                sprintf(msg, "IRs: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                ir0=0;
-                ir1=0;
-                ir2=0;
-                ir3=0;
-                ir4=0;
-                ir5=0;
-                ir6=0;
-                ir7=0;
-            } else {
-                ir0 = (RxBuffer[0]+RxBuffer[1]*256>2000)?2000:RxBuffer[0]+RxBuffer[1]*256;
-                ir1 = (RxBuffer[2]+RxBuffer[3]*256>2000)?2000:RxBuffer[2]+RxBuffer[3]*256;
-                ir2 = (RxBuffer[4]+RxBuffer[5]*256>2000)?2000:RxBuffer[4]+RxBuffer[5]*256;
-                ir3 = (RxBuffer[6]+RxBuffer[7]*256>2000)?2000:RxBuffer[6]+RxBuffer[7]*256;
-                ir4 = (RxBuffer[8]+RxBuffer[9]*256>2000)?2000:RxBuffer[8]+RxBuffer[9]*256;
-                ir5 = (RxBuffer[10]+RxBuffer[11]*256>2000)?2000:RxBuffer[10]+RxBuffer[11]*256;
-                ir6 = (RxBuffer[12]+RxBuffer[13]*256>2000)?2000:RxBuffer[12]+RxBuffer[13]*256;
-                ir7 = (RxBuffer[14]+RxBuffer[15]*256>2000)?2000:RxBuffer[14]+RxBuffer[15]*256;
-                if(ir0<0) {
-                    ir0=0;
-                }
-                if(ir1<0) {
-                    ir1=0;
-                }
-                if(ir2<0) {
-                    ir2=0;
-                }
-                if(ir3<0) {
-                    ir3=0;
-                }
-                if(ir4<0) {
-                    ir4=0;
-                }
-                if(ir5<0) {
-                    ir5=0;
-                }
-                if(ir6<0) {
-                    ir6=0;
-                }
-                if(ir7<0) {
-                    ir7=0;
-                }
-            }
-
-            //LIGHT SENSORS DATA
-            memset(RxBuffer, 0x0, 45);
-            lightAvg=0;
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,16,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, 16);
-            } else {
-                bytes=0;
-            }
-        #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
-                break;
-            } else if(bytes<16) {
-                sprintf(msg, "Light: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                lightAvg=0;
-            } else {
-                lightAvg += (RxBuffer[0]+RxBuffer[1]*256);
-                lightAvg += (RxBuffer[2]+RxBuffer[3]*256);
-                lightAvg += (RxBuffer[4]+RxBuffer[5]*256);
-                lightAvg += (RxBuffer[6]+RxBuffer[7]*256);
-                lightAvg += (RxBuffer[8]+RxBuffer[9]*256);
-                lightAvg += (RxBuffer[10]+RxBuffer[11]*256);
-                lightAvg += (RxBuffer[12]+RxBuffer[13]*256);
-                lightAvg += (RxBuffer[14]+RxBuffer[15]*256);
-                lightAvg = (int) (lightAvg/8);
-                lightAvg = (lightAvg>4000)?4000:lightAvg;
-                if(lightAvg<0) {
-                    lightAvg=0;
-                }
-            }
-
-            //MICROPHONE DATA
-            memset(RxBuffer, 0x0, 45);
-            if((int)asercomVer == 1) {
-                bytesToRead = 6;
-            } else {
-                bytesToRead = 8;
-            }
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,bytesToRead,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, bytesToRead);
-            } else {
-                bytes=0;
-            }
-        #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
-                break;
-            } else if(bytes<bytesToRead) {
-                sprintf(msg, "MICs: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                micVolume[0]=micVolume[1]=micVolume[2]=micVolume[3]=0;
-            } else {
-                micVolume[0] = ((uint8_t)RxBuffer[0]+(uint8_t)RxBuffer[1]*256>1500)?1500:((uint8_t)RxBuffer[0]+(uint8_t)RxBuffer[1]*256);
-                micVolume[1] = ((uint8_t)RxBuffer[2]+(uint8_t)RxBuffer[3]*256>1500)?1500:((uint8_t)RxBuffer[2]+(uint8_t)RxBuffer[3]*256);
-                micVolume[2] = ((uint8_t)RxBuffer[4]+(uint8_t)RxBuffer[5]*256>1500)?1500:((uint8_t)RxBuffer[4]+(uint8_t)RxBuffer[5]*256);
+            } else { // Re-activate sensors reading
+                //std::cerr << "restart sensors" << std::endl;
+                sending_async_commands = false;
+                memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                packet_index = 0;
+                serialPort->write(command_sensors, bytesToSendSensors);
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                m_timer.start(TIMEOUT_MS);
                 if((int)asercomVer == 1) {
-                    micVolume[3] = 0;
+                    bytesToRead = 58; //12+16+16+6+2+6;
                 } else {
-                    micVolume[3] = ((uint8_t)RxBuffer[6]+(uint8_t)RxBuffer[7]*256>1500)?1500:((uint8_t)RxBuffer[6]+(uint8_t)RxBuffer[7]*256);
+                    bytesToRead = 64; //12+16+16+8+2+6+2+1+1;
                 }
+                read_state = 2;
             }
+        }
+    }
+}
 
-            //BATTERY DATA
-            memset(RxBuffer, 0x0, 45);
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,2,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, 2);
-            } else {
-                bytes=0;
-            }
-        #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
+void CommThread::handleError(QSerialPort::SerialPortError error) {
+    //std::cerr << "handleError" << std::endl;
+    //std::cerr << "err = " << error << std::endl;
+}
+
+void CommThread::readyRead() {
+    std::cerr << "readyRead (" << (int)read_state << "), [" << (int)serialPort->bytesAvailable() << "]" << std::endl;
+
+    while(serialPort->bytesAvailable() > 0) {
+
+        switch(read_state) {
+            case 0: // Clear communication
+                //m_timer.stop();
+                bytesRead = serialPort->read((char *)temp_buffer, 100);
+                std::cerr << "Garbage = " << temp_buffer << std::endl;
+                bytesToRead = 0;
+                std::cerr << (int)bytesRead << "/" << (int)bytesToRead << std::endl;
+                serialPort->waitForReadyRead(20);
                 break;
-            } else if(bytes<2) {
-                sprintf(msg, "Battery: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                batteryRaw=0;
-                memset(batteryRawStr, 0x0, 5);
-                sprintf(batteryRawStr, "%d", 0);
-            } else {
-                batteryRaw = (uint8_t)RxBuffer[0]+(uint8_t)RxBuffer[1]*256;
-                memset(batteryRawStr, 0x0, 5);
-                sprintf(batteryRawStr, "%d", batteryRaw);
-            }
 
-            //GYRO DATA
-            memset(RxBuffer, 0x0, 45);
-        #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,6,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read(RxBuffer, 6);
-            } else {
-                bytes=0;
-            }
-        #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
+            case 1: // Getting asercom version
+                //m_timer.stop();
+                packet_index += serialPort->read((char *)&temp_buffer[packet_index], 100-packet_index);
+                bytesRead = packet_index;
+                bytesToRead = 0;
+                std::cerr << (int)bytesRead << "/" << (int)bytesToRead << std::endl;
+                serialPort->waitForReadyRead(20);
                 break;
-            } else if(bytes<6) {
-                sprintf(msg, "Gyro: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                gyroRaw[0]=0;
-                gyroRaw[1]=0;
-                gyroRaw[2]=0;
-            } else {
-                gyroRaw[0] = RxBuffer[0]+RxBuffer[1]*256;
-                gyroRaw[1] = RxBuffer[2]+RxBuffer[3]*256;
-                gyroRaw[2] = RxBuffer[4]+RxBuffer[5]*256;
-            }
 
-
-            if((int)asercomVer == 2) {
-
-                // ToF DATA
-                memset(RxBuffer, 0x0, 45);
-            #ifdef __WIN32__
-                bytes=comm->ReadBytes((BYTE*)RxBuffer,2,1000000);
-            #else
-                if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                    bytes=serialPort.read(RxBuffer, 2);
-                } else {
-                    bytes=0;
-                }
-            #endif
-                if(bytes == 0) {
-                    //emit disconnect();
-                    reconnectFlag = true;
-                    break;
-                } else if(bytes<2) {
-                    sprintf(msg, "ToF: only %d bytes red", bytes);
-                    std::cerr << msg << std::endl;
-                    distanceCm = 0;
-                    memset(distanceCmStr, 0x0, 5);
-                    sprintf(distanceCmStr, "%d", 0);
-                } else {
-                    distanceCm = (uint16_t)(((uint8_t)RxBuffer[1]<<8)|((uint8_t)RxBuffer[0]))/10;
-                    memset(distanceCmStr, 0x0, 5);
-                    sprintf(distanceCmStr, "%d", (distanceCm>200)?200:distanceCm);
-                }
-
-                // Button state.
-                memset(RxBuffer, 0x0, 45);
-            #ifdef __WIN32__
-                bytes=comm->ReadBytes((BYTE*)RxBuffer,1,1000000);
-            #else
-                if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                    bytes=serialPort.read(RxBuffer, 1);
-                } else {
-                    bytes=0;
-                }
-            #endif
-                if(bytes == 0) {
-                    //emit disconnect();
-                    reconnectFlag = true;
-                    break;
-                } else if(bytes<1) {
-                    sprintf(msg, "Button: only %d bytes red", bytes);
-                    std::cerr << msg << std::endl;
-                } else {
-                    buttonState = RxBuffer[0];
-                }
-				
-                // Micro sd state.
-                memset(RxBuffer, 0x0, 45);
-            #ifdef __WIN32__
-                bytes=comm->ReadBytes((BYTE*)RxBuffer,1,1000000);
-            #else
-                if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                    bytes=serialPort.read(RxBuffer, 1);
-                } else {
-                    bytes=0;
-                }
-            #endif
-                if(bytes == 0) {
-                    //emit disconnect();
-                    reconnectFlag = true;
-                    break;
-                } else if(bytes<1) {
-                    sprintf(msg, "Micro sd: only %d bytes red", bytes);
-                    std::cerr << msg << std::endl;
-                } else {
-                    microSdState = RxBuffer[0];
-                }
-            }
-
-            emit newBinaryData();
-
-            //SELECTOR DATA (ascii mode)
-            memset(RxBuffer, 0x0, 45);
-            int selector;
-            #ifdef __WIN32__
-                    comm->PurgeCommPort();
-                    comm->WriteBuffer((BYTE*)"C\r", 2);
-                    comm->FlushCommPort();
-                    Sleep(100);
-                    bytes = comm->ReadBytes((BYTE*)RxBuffer,5,1000000);
-            #else
-                    //comm->flush();
-                    serialPort.write("C\r",2);
-                    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                        bytes=serialPort.read(RxBuffer, 5);
-                    } else {
-                        bytes=0;
+            case 2: // Read sensors (binary)
+               // m_timer.stop();
+                packet_index += serialPort->read((char *)&RxBuffer[packet_index], bytesToRead-packet_index);
+                bytesRead = packet_index;
+                std::cerr << (int)bytesRead << "/" << (int)bytesToRead << std::endl;
+                if(packet_index == bytesToRead) {
+                    // Acceleration
+                    mantis=0;
+                    exp=0;
+                    flt=0;
+                    mantis = (RxBuffer[0] & 0xff) + ((RxBuffer[1] & 0xffl) << 8) + (((RxBuffer[2] &0x7fl) | 0x80) << 16);
+                    exp = (RxBuffer[3] & 0x7f) * 2 + ((RxBuffer[2] & 0x80) ? 1 : 0);
+                    if (RxBuffer[3] & 0x80) {
+                        mantis = -mantis;
                     }
-            #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
-                break;
-            } else if(bytes<5) {
-                sprintf(msg, "Selector: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                    //comm->discard(5-bytes);
-            } else {
-                memset(selectorStr, 0x0, 3);
-                sscanf((char*)RxBuffer,"c,%d\r\n",&selector);
-                sprintf(selectorStr, "%d", selector);
-            }
+                    flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
+                    acceleration=flt;
 
-            //IR DATA (ascii mode)
-            memset(RxBuffer, 0x0, 45);
-            int ir_check, ir_address, ir_data;
-            #ifdef __WIN32__
-                    comm->PurgeCommPort();
-                    comm->WriteBuffer((BYTE*)"G\r", 2);
-                    comm->FlushCommPort();
-                    Sleep(100);
-                    bytes = comm->ReadBytes((BYTE*)RxBuffer,45,1000000);
-            #else
-                    //comm->flush();
-                    serialPort.write("G\r",2);
-                    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                        bytes=serialPort.read(RxBuffer, 45);
-                    } else {
-                        bytes=0;
+                    // Orientation
+                    mantis = (RxBuffer[4] & 0xff) + ((RxBuffer[5] & 0xffl) << 8) + (((RxBuffer[6] &0x7fl) | 0x80) << 16);
+                    exp = (RxBuffer[7] & 0x7f) * 2 + ((RxBuffer[6] & 0x80) ? 1 : 0);
+                    if (RxBuffer[7] & 0x80)
+                        mantis = -mantis;
+                    flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
+                    orientation=flt;
+                    if (orientation < 0.0 )
+                        orientation=0.0;
+                    if (orientation > 360.0 )
+                        orientation=360.0;
+
+                    // Inclination
+                    mantis = (RxBuffer[8] & 0xff) + ((RxBuffer[9] & 0xffl) << 8) + (((RxBuffer[10] &0x7fl) | 0x80) << 16);
+                    exp = (RxBuffer[11] & 0x7f) * 2 + ((RxBuffer[10] & 0x80) ? 1 : 0);
+                    if (RxBuffer[11] & 0x80)
+                        mantis = -mantis;
+                    flt = (mantis || exp) ? ((float) ldexp (mantis, (exp - 127 - 23))): 0;
+                    inclination=flt;
+                    if (inclination < 0.0 )
+                        inclination=0.0;
+                    if (inclination > 180.0 )
+                        inclination=180.0;
+
+                    // Proximity
+                    ir0 = (RxBuffer[12]+RxBuffer[13]*256>2000)?2000:RxBuffer[12]+RxBuffer[13]*256;
+                    ir1 = (RxBuffer[14]+RxBuffer[15]*256>2000)?2000:RxBuffer[14]+RxBuffer[15]*256;
+                    ir2 = (RxBuffer[16]+RxBuffer[17]*256>2000)?2000:RxBuffer[16]+RxBuffer[17]*256;
+                    ir3 = (RxBuffer[18]+RxBuffer[19]*256>2000)?2000:RxBuffer[18]+RxBuffer[19]*256;
+                    ir4 = (RxBuffer[20]+RxBuffer[21]*256>2000)?2000:RxBuffer[20]+RxBuffer[21]*256;
+                    ir5 = (RxBuffer[22]+RxBuffer[23]*256>2000)?2000:RxBuffer[22]+RxBuffer[23]*256;
+                    ir6 = (RxBuffer[24]+RxBuffer[25]*256>2000)?2000:RxBuffer[24]+RxBuffer[25]*256;
+                    ir7 = (RxBuffer[26]+RxBuffer[27]*256>2000)?2000:RxBuffer[26]+RxBuffer[27]*256;
+                    if(ir0<0) {
+                        ir0=0;
                     }
-            #endif
-            if(bytes == 0) {
-                //emit disconnect();
-                reconnectFlag = true;
+                    if(ir1<0) {
+                        ir1=0;
+                    }
+                    if(ir2<0) {
+                        ir2=0;
+                    }
+                    if(ir3<0) {
+                        ir3=0;
+                    }
+                    if(ir4<0) {
+                        ir4=0;
+                    }
+                    if(ir5<0) {
+                        ir5=0;
+                    }
+                    if(ir6<0) {
+                        ir6=0;
+                    }
+                    if(ir7<0) {
+                        ir7=0;
+                    }
+
+                    // Ambient
+                    lightAvg += (RxBuffer[28]+RxBuffer[29]*256);
+                    lightAvg += (RxBuffer[30]+RxBuffer[31]*256);
+                    lightAvg += (RxBuffer[32]+RxBuffer[33]*256);
+                    lightAvg += (RxBuffer[34]+RxBuffer[35]*256);
+                    lightAvg += (RxBuffer[36]+RxBuffer[37]*256);
+                    lightAvg += (RxBuffer[38]+RxBuffer[39]*256);
+                    lightAvg += (RxBuffer[40]+RxBuffer[41]*256);
+                    lightAvg += (RxBuffer[42]+RxBuffer[43]*256);
+                    lightAvg = (int) (lightAvg/8);
+                    lightAvg = (lightAvg>4000)?4000:lightAvg;
+                    if(lightAvg<0) {
+                        lightAvg=0;
+                    }
+
+                    if((int)asercomVer == 1) {
+                        // Microphone
+                        micVolume[0] = ((uint8_t)RxBuffer[44]+(uint8_t)RxBuffer[45]*256>1500)?1500:((uint8_t)RxBuffer[44]+(uint8_t)RxBuffer[45]*256);
+                        micVolume[1] = ((uint8_t)RxBuffer[46]+(uint8_t)RxBuffer[47]*256>1500)?1500:((uint8_t)RxBuffer[46]+(uint8_t)RxBuffer[47]*256);
+                        micVolume[2] = ((uint8_t)RxBuffer[48]+(uint8_t)RxBuffer[49]*256>1500)?1500:((uint8_t)RxBuffer[48]+(uint8_t)RxBuffer[49]*256);
+                        micVolume[3] = 0;
+
+                        // Battery
+                        batteryRaw = (uint8_t)RxBuffer[50]+(uint8_t)RxBuffer[51]*256;
+                        memset(batteryRawStr, 0x0, 5);
+                        sprintf(batteryRawStr, "%d", batteryRaw);
+
+                        // Gyro
+                        gyroRaw[0] = RxBuffer[52]+RxBuffer[53]*256;
+                        gyroRaw[1] = RxBuffer[54]+RxBuffer[55]*256;
+                        gyroRaw[2] = RxBuffer[56]+RxBuffer[57]*256;
+
+                    } else {
+                        // Microphone
+                        micVolume[0] = ((uint8_t)RxBuffer[44]+(uint8_t)RxBuffer[45]*256>1500)?1500:((uint8_t)RxBuffer[44]+(uint8_t)RxBuffer[45]*256);
+                        micVolume[1] = ((uint8_t)RxBuffer[46]+(uint8_t)RxBuffer[47]*256>1500)?1500:((uint8_t)RxBuffer[46]+(uint8_t)RxBuffer[47]*256);
+                        micVolume[2] = ((uint8_t)RxBuffer[48]+(uint8_t)RxBuffer[49]*256>1500)?1500:((uint8_t)RxBuffer[48]+(uint8_t)RxBuffer[49]*256);
+                        micVolume[3] = ((uint8_t)RxBuffer[50]+(uint8_t)RxBuffer[51]*256>1500)?1500:((uint8_t)RxBuffer[50]+(uint8_t)RxBuffer[51]*256);
+
+                        // Battery
+                        batteryRaw = (uint8_t)RxBuffer[52]+(uint8_t)RxBuffer[53]*256;
+                        memset(batteryRawStr, 0x0, 5);
+                        sprintf(batteryRawStr, "%d", batteryRaw);
+
+                        // Gyro
+                        gyroRaw[0] = RxBuffer[54]+RxBuffer[55]*256;
+                        gyroRaw[1] = RxBuffer[56]+RxBuffer[57]*256;
+                        gyroRaw[2] = RxBuffer[58]+RxBuffer[59]*256;
+
+                        // Distance sensor
+                        distanceCm = (uint16_t)(((uint8_t)RxBuffer[61]<<8)|((uint8_t)RxBuffer[60]))/10;
+                        memset(distanceCmStr, 0x0, 5);
+                        sprintf(distanceCmStr, "%d", (distanceCm>200)?200:distanceCm);
+
+                        // Button
+                        buttonState = RxBuffer[62];
+
+                        // Micro sd
+                        microSdState = RxBuffer[63];
+                    }
+
+                    emit newBinaryData();
+
+                    /*
+                    memset(async_command, 0x0, 20);
+                    sprintf(async_command, "%c%c",'C', '\r');
+                    cmd_list.push_back(std::string(async_command, 2));
+                    cmd_list_len.push_back(2);
+                    cmd_list_need_answer.push_back(true);
+                    cmd_list_answer_len.push_back(5);
+                    */
+
+                    serialPort->write("C\r",2); // Request selector
+                    packet_index = 0;
+                    memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                    m_timer.start(TIMEOUT_MS);
+                    bytesToRead = 5;
+                    read_state = 5;
+
+                }
+
                 break;
-            } else if(bytes<45) {
-                sprintf(msg, "IRs data: only %d bytes red", bytes);
-                std::cerr << msg << std::endl;
-                    //comm->discard(45-bytes);
-            } else {
-                memset(irCheckStr, 0x0, 8);
-                memset(irAddressStr, 0x0, 8);
-                memset(irDataStr, 0x0, 8);
-                sscanf((char*)RxBuffer,"g IR check : 0x%x, address : 0x%x, data : 0x%x\r\n",&ir_check,&ir_address,&ir_data);
-                sprintf(irCheckStr, "%x", ir_check);
-                sprintf(irAddressStr, "%x", ir_address);
-                sprintf(irDataStr, "%x", ir_data);
-            }
 
-            emit newAsciiData();
+            case 3: // Read camera
+                //m_timer.stop();
+                //std::cerr << "Reading camera: " << packet_index << "/"  << (int)bytesToRead << std::endl;
+                packet_index += serialPort->read((char*)&imgBuffer[packet_index], bytesToRead-packet_index);
+                bytesRead = packet_index;
+                std::cerr << (int)bytesRead << "/" << (int)bytesToRead << std::endl;
+                if(bytesRead == bytesToRead) {
+                    emit newImage();
+                }
+                break;
 
-        }   // end get sensor data
+            case 4:
+                //m_timer.stop();
+                packet_index += serialPort->read((char*)&RxBuffer[packet_index], cmd_list_answer_len.front()-packet_index);
+                bytesToRead = cmd_list_answer_len.front();
+                bytesRead = packet_index;
+                std::cerr << (int)bytesRead << "/" << (int)bytesToRead << std::endl;
+                if(packet_index == cmd_list_answer_len.front()) {
+                    //std::cerr << "answer received" << std::endl;
+                    cmd_list_need_answer.erase(cmd_list_need_answer.begin());
+                    cmd_list_answer_len.erase(cmd_list_answer_len.begin());
+                    if(cmd_list.size() > 0) { // Continue sending async commands if needed
+                        memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                        packet_index = 0;
+                        serialPort->write(cmd_list.front().c_str(), cmd_list_len.front());
+                        //serialPort->flush();
+                        //serialPort->waitForBytesWritten(-1);
+                        //memcpy(temp_buffer, &cmd_list.front()[0], cmd_list_len.front());
+                        //serialPort->write((char*)temp_buffer, cmd_list_len.front());
+                        m_timer.start(TIMEOUT_MS);
+                        cmd_list.erase(cmd_list.begin());
+                        cmd_list_len.erase(cmd_list_len.begin());
+                    } else { // Re-activate sensors reading
+                        sending_async_commands = false;
+                        read_state = 2;
+                    }
+                }
+                break;
 
-        if(getCameraData) {
+            case 5: // Read selecor in ASCII
+                packet_index += serialPort->read((char *)&RxBuffer[packet_index], bytesToRead-packet_index);
+                bytesRead = packet_index;
+                if(packet_index == bytesToRead) {
+                    memset(selectorStr, 0x0, 3);
+                    sscanf((char*)RxBuffer,"c,%d\r\n",&selector);
+                    sprintf(selectorStr, "%d", selector);
 
-            headerReceived=false;
-            imgReceived=false;
-            wrongAnswer=true;
+                    serialPort->write("G\r",2); // Request tv remote
+                    packet_index = 0;
+                    memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                    m_timer.start(TIMEOUT_MS);
+                    bytesToRead = 45;
+                    read_state = 6;
+                }
+                break;
 
-            command[0]=-'I';      //binary image receiving command
-            command[1]= 0;        //end command
+            case 6: // Read tv remote
+                packet_index += serialPort->read((char *)&RxBuffer[packet_index], bytesToRead-packet_index);
+                bytesRead = packet_index;
+                if(packet_index == bytesToRead) {
+                    memset(irCheckStr, 0x0, 8);
+                    memset(irAddressStr, 0x0, 8);
+                    memset(irDataStr, 0x0, 8);
+                    sscanf((char*)RxBuffer,"g IR check : 0x%x, address : 0x%x, data : 0x%x\r\n",&ir_check,&ir_address,&ir_data);
+                    sprintf(irCheckStr, "%x", ir_check);
+                    sprintf(irAddressStr, "%x", ir_address);
+                    sprintf(irDataStr, "%x", ir_data);
 
-            //send command
-        #ifdef __WIN32__
-            comm->PurgeCommPort();
-            comm->WriteBuffer((BYTE*)command, 2);
-            comm->FlushCommPort();
-            Sleep(100);
-        #else
-            //comm->flush();
-            bytes = serialPort.write(command,2);
-        #endif
+                    packet_index = 0;
+                    memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                    emit newAsciiData();
+                    read_state = 2;
+                }
+                break;
 
-            headerReceived=true;
-            imgReceived=true;
-            wrongAnswer=false;
-
-            //read image header
-        #ifdef __WIN32__
-            bytes = comm->ReadBytes((BYTE*)imgBuffer,pixNum+3,1000000);
-        #else
-            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-                bytes=serialPort.read((char*)imgBuffer, pixNum+3);
-            } else {
-                bytes=0;
-            }
-        #endif
-
-            emit newImage();
-        }   // end get camera data
-
-
-        if(goUpNow) {
-            goUpNow = false;
-            sendGoUp(motorSpeed);
-            usleep(20000);
+            default:
+                std::cerr << "Uknown read_state (1)" << std::endl;
+                break;
         }
 
-        if(goDownNow) {
-            goDownNow = false;
-            sendGoDown(motorSpeed);
-            usleep(20000);
-        }
+        //serialPort->waitForReadyRead(20); // This is needed because not all data are always received in one shot. This delay limits the maximum refresh rate
 
-        if(goLeftNow) {
-            goLeftNow = false;
-            sendGoLeft(motorSpeed);
-            usleep(20000);
-        }
-
-        if(goRightNow) {
-            goRightNow = false;
-            sendGoRight(motorSpeed);
-            usleep(20000);
-        }
-
-        if(stopNow) {
-            stopNow = false;
-            sendStop();
-            usleep(20000);
-        }
-
-        if(updateLed0Now) {
-            updateLed0Now = false;
-            sendUpdateLed0(stateLed0);
-            usleep(20000);
-        }
-
-        if(updateLed1Now) {
-            updateLed1Now = false;
-            sendUpdateLed1(stateLed1);
-            usleep(20000);
-        }
-
-        if(updateLed2Now) {
-            updateLed2Now = false;
-            sendUpdateLed2(stateLed2);
-            usleep(20000);
-        }
-
-        if(updateLed3Now) {
-            updateLed3Now = false;
-            sendUpdateLed3(stateLed3);
-            usleep(20000);
-        }
-
-        if(updateLed4Now) {
-            updateLed4Now = false;
-            sendUpdateLed4(stateLed4);
-            usleep(20000);
-        }
-
-        if(updateLed5Now) {
-            updateLed5Now = false;
-            sendUpdateLed5(stateLed5);
-            usleep(20000);
-        }
-
-        if(updateLed6Now) {
-            updateLed6Now = false;
-            sendUpdateLed6(stateLed6);
-            usleep(20000);
-        }
-
-        if(updateLed7Now) {
-            updateLed7Now = false;
-            sendUpdateLed7(stateLed7);
-            usleep(20000);
-        }
-
-        if(updateLed8Now) {
-            updateLed8Now = false;
-            sendUpdateLed8(stateLed8);
-            usleep(20000);
-        }
-
-        if(updateLed9Now) {
-            updateLed9Now = false;
-            sendUpdateLed9(stateLed9);
-            usleep(20000);
-        }
-
-        if(sound1Now) {
-            sound1Now = false;
-            sendSound1();
-        }
-
-        if(sound2Now) {
-            sound2Now = false;
-            sendSound2();
-        }
-
-        if(sound3Now) {
-            sound3Now = false;
-            sendSound3();
-        }
-
-        if(sound4Now) {
-            sound4Now = false;
-            sendSound4();
-        }
-
-        if(sound5Now) {
-            sound5Now = false;
-            sendSound5();
-        }
-
-        if(audioOffNow) {
-            audioOffNow = false;
-            sendAudioOff();
-        }
-
-    }   // end infinite loop
-
-    closeCommunication();
-    msleep(300);
-    if(reconnectFlag) {
-        emit reconnect();
     }
 
+    if((bytesToRead>0) && (bytesRead!=bytesToRead)) {
+        return;
+    }
+
+    //if(bytesRead == 0) {  // Can't happen because this function "readyRead" is called only when there is something to read. If no data is received, then the timer will timeout instead.
+    //} else
+    //if(bytesToRead>0 && bytesToRead!=bytesRead) { // Not all expected bytes are received from the robot, restart communication with the robot.
+    //    std::cerr << "Not all data recevied for the previous request, restart the communication..." << std::endl;
+    //    closeCommunication(true, false);
+    //    return;
+    //}
+
+    switch(read_state) {
+        case 0: // Garbage collected, now request the protocol version
+            sprintf(command, "V\r");
+            serialPort->write(command, 2);
+            //serialPort->flush();
+            //serialPort->waitForBytesWritten(-1);
+            packet_index = 0;
+            read_state = 1;
+            conn_state = 1; // Getting protocol version
+            std::cerr << "Getting protocol version" << std::endl;
+            m_timer.start(TIMEOUT_MS);
+            break;
+
+        case 1:
+            std::cerr << "version = " << temp_buffer << std::endl;
+            emit showVersion((char *)&temp_buffer[2], 0);
+
+            asercomVer = temp_buffer[10]-'0';
+            std::cerr << "asercom version = " << (int)asercomVer << std::endl;
+
+            if(asercomVer!=1 && asercomVer!=2) {
+                std::cerr << "Unable to work with this protocol version, restart the communication" << std::endl;
+                closeCommunication(true, false);
+                return;
+            }
+
+            emit portOpened(); // Call EPuckMonitor->portOpened to "enable" the interface
+
+            conn_trials = 0;
+            conn_state = 2; // Getting sensors/camera data.
+            std::cerr << "Getting sensors/camera data " << std::endl;
+            //getSensorsData = true;
+            //getCameraData = false;
+
+            packet_index = 0;
+            memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+            if(getSensorsData) {
+                if((int)asercomVer == 1) {
+                    bytesToSendSensors = 7;
+                    bytesToRead = 58; //12+16+16+6+2+6;
+                    command_sensors[0]=-'A';                        //accelerometer request
+                    command_sensors[1]=-'N';                        //proximity sensors request
+                    command_sensors[2]=-'O';                        //ambient light request
+                    command_sensors[3]=-'u';                        //microphones request (3 x mic)
+                    command_sensors[4]=-'b';                        // Battery raw value.
+                    command_sensors[5]=-'g';                        // Gyro raw value.
+                    command_sensors[6]=0;                           //binary command ending
+                } else {
+                    bytesToSendSensors = 10;
+                    bytesToRead = 64; //12+16+16+8+2+6+2+1+1;
+                    command_sensors[0]=-'A';                        //accelerometer request
+                    command_sensors[1]=-'N';                        //proximity sensors request
+                    command_sensors[2]=-'O';                        //ambient light request
+                    command_sensors[3]=-0x0C;                       //microphones request (4 x mic)
+                    command_sensors[4]=-'b';                        // Battery raw value.
+                    command_sensors[5]=-'g';                        // Gyro raw value.
+                    command_sensors[6]=-0x0D;                       // ToF sensor value.
+                    command_sensors[7]=-0x0B;                       // User button state.
+                    command_sensors[8]=-0x0E;                       // Micro sd state.
+                    command_sensors[9]=0;                           //binary command ending
+                }
+
+                //send all the request in one shot
+                serialPort->write(command_sensors, bytesToSendSensors);
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                m_timer.start(TIMEOUT_MS);
+                std::cerr << "Request binary sensors" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+                read_state = 2;
+            } else if(getCameraData) {
+
+                headerReceived=false;
+                imgReceived=false;
+                wrongAnswer=true;
+
+                //send command
+                //comm->flush();
+                serialPort->write(command_cam, 2);
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                m_timer.start(TIMEOUT_MS);
+
+                headerReceived=true;
+                imgReceived=true;
+                wrongAnswer=false;
+                bytesToRead = pixNum+3;
+                read_state = 3;
+                std::cerr << "Request camera" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+            }
+            break;
+
+        case 2:
+            packet_index = 0;
+            memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+            if(reading_ascii_data) {
+                break;
+            }
+            if(cmd_list.size() > 0) { // Start sending async commands if needed
+                sending_async_commands = true;
+                serialPort->write(cmd_list.front().c_str(), cmd_list_len.front());              
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                //memcpy(temp_buffer, &cmd_list.front()[0], cmd_list_len.front());
+                //serialPort->write((char*)temp_buffer, cmd_list_len.front());
+                //std::cerr << "sending = ";
+                //for(int i=0; i<cmd_list.front().length(); i++) {
+                //    std::cerr << int(cmd_list.front()[i]) << ",";
+                //}
+                //std::cerr << std::endl;
+                m_timer.start(TIMEOUT_MS);
+                cmd_list.erase(cmd_list.begin());
+                cmd_list_len.erase(cmd_list_len.begin());
+                bytesToRead = cmd_list_answer_len.front();
+                std::cerr << "Request async (" << int(cmd_list.front()[0]) << ")" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+                if(cmd_list_need_answer.front()) {
+                    read_state = 4;
+                }
+                //read_state = 5; // Because it happens that "readyRead" is called before "handleBytesWritten" and this can lead to problems. By setting 5, "readyRead" is in a wait state.
+
+                /*
+                if(cmd_list_need_answer.front()) { // The last async command need an answer
+                    read_state = 4;
+                    //std::cerr << "need answer" << std::endl;
+                } else {
+                    cmd_list_need_answer.erase(cmd_list_need_answer.begin());
+                    cmd_list_answer_len.erase(cmd_list_answer_len.begin());
+                    if(cmd_list.size() > 0) { // Continue sending async commands if needed
+                        //std::cerr << "no need answer, send next command" << std::endl;
+                        memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                        packet_index = 0;
+                        serialPort->write(cmd_list.front().c_str(), cmd_list_len.front());
+                        //serialPort->flush();
+                        //serialPort->waitForBytesWritten(-1);
+                        //memcpy(temp_buffer, &cmd_list.front()[0], cmd_list_len.front());
+                        //serialPort->write((char*)temp_buffer, cmd_list_len.front());
+                        m_timer.start(TIMEOUT_MS);
+                        cmd_list.erase(cmd_list.begin());
+                        cmd_list_len.erase(cmd_list_len.begin());
+                    } else { // Re-activate sensors reading
+                        //std::cerr << "restart sensors" << std::endl;
+                        sending_async_commands = false;
+                        memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                        packet_index = 0;
+                        serialPort->write(command_sensors, bytesToSendSensors);
+                        //serialPort->flush();
+                        //serialPort->waitForBytesWritten(-1);
+                        m_timer.start(TIMEOUT_MS);
+                        if((int)asercomVer == 1) {
+                            bytesToRead = 58; //12+16+16+6+2+6;
+                        } else {
+                            bytesToRead = 64; //12+16+16+8+2+6+2+1+1;
+                        }
+                        read_state = 2;
+                    }
+                }
+                */
+                break;
+            }
+            if(getCameraData) { // If enabled, read the camera now since we just read the sensors
+                headerReceived=false;
+                imgReceived=false;
+                wrongAnswer=true;
+
+                serialPort->write(command_cam, 2);
+                m_timer.start(TIMEOUT_MS);
+
+                headerReceived=true;
+                imgReceived=true;
+                wrongAnswer=false;
+                bytesToRead = pixNum+3;
+                read_state = 3;
+                std::cerr << "Request camera" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+            } else if(getSensorsData) { // Otherwise read once more the sensors if enabled
+                //send all the request in one shot               
+                serialPort->write(command_sensors, bytesToSendSensors);
+                m_timer.start(TIMEOUT_MS);
+                if((int)asercomVer == 1) {
+                    bytesToRead = 58; //12+16+16+6+2+6;
+                } else {
+                    bytesToRead = 64; //12+16+16+8+2+6+2+1+1;
+                }
+                read_state = 2;
+                std::cerr << "Request binary sensors" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+            }
+            break;
+
+        case 3:
+            packet_index = 0;
+            memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+            if(cmd_list.size() > 0) { // Start sending async commands if needed
+                sending_async_commands = true;
+                serialPort->write(cmd_list.front().c_str(), cmd_list_len.front());
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                //memcpy(temp_buffer, &cmd_list.front()[0], cmd_list_len.front());
+                //serialPort->write((char*)temp_buffer, cmd_list_len.front());
+                //std::cerr << "sending = ";
+                //for(int i=0; i<cmd_list.front().length(); i++) {
+                //    std::cerr << int(cmd_list.front()[i]) << ",";
+                //}
+                //std::cerr << std::endl;
+                m_timer.start(TIMEOUT_MS);
+                cmd_list.erase(cmd_list.begin());
+                cmd_list_len.erase(cmd_list_len.begin());
+                bytesToRead = cmd_list_answer_len.front();
+                std::cerr << "Request async (" << int(cmd_list.front()[0]) << ")" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+                if(cmd_list_need_answer.front()) {
+                    read_state = 4;
+                }
+                //read_state = 5; // Because it happens that "readyRead" is called before "handleBytesWritten" and this can lead to problems. By setting 5, "readyRead" is in a wait state.
+
+                /*
+                if(cmd_list_need_answer.front()) { // The last async command need an answer
+                    read_state = 4;
+                    //std::cerr << "need answer" << std::endl;
+                } else {
+                    cmd_list_need_answer.erase(cmd_list_need_answer.begin());
+                    cmd_list_answer_len.erase(cmd_list_answer_len.begin());
+                    if(cmd_list.size() > 0) { // Continue sending async commands if needed
+                        //std::cerr << "no need answer, send next command" << std::endl;
+                        memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                        packet_index = 0;
+                        serialPort->write(cmd_list.front().c_str(), cmd_list_len.front());
+                        //serialPort->flush();
+                        //serialPort->waitForBytesWritten(-1);
+                        //memcpy(temp_buffer, &cmd_list.front()[0], cmd_list_len.front());
+                        //serialPort->write((char*)temp_buffer, cmd_list_len.front());
+                        m_timer.start(TIMEOUT_MS);
+                        cmd_list.erase(cmd_list.begin());
+                        cmd_list_len.erase(cmd_list_len.begin());
+                    } else { // Re-activate sensors reading
+                        //std::cerr << "restart sensors" << std::endl;
+                        sending_async_commands = false;
+                        memset(RxBuffer, 0x0, RX_BUFF_SIZE);
+                        packet_index = 0;
+                        serialPort->write(command_sensors, bytesToSendSensors);
+                        //serialPort->flush();
+                        //serialPort->waitForBytesWritten(-1);
+                        m_timer.start(TIMEOUT_MS);
+                        if((int)asercomVer == 1) {
+                            bytesToRead = 58; //12+16+16+6+2+6;
+                        } else {
+                            bytesToRead = 64; //12+16+16+8+2+6+2+1+1;
+                        }
+                        read_state = 2;
+                    }
+                }
+                */
+                break;
+            }
+            if(getSensorsData) { // If enaled, read the sensors now since we just read the camera
+                //send all the request in one shot
+                serialPort->write(command_sensors, bytesToSendSensors);
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                m_timer.start(TIMEOUT_MS);
+                if((int)asercomVer == 1) {
+                    bytesToRead = 58; //12+16+16+6+2+6;
+                } else {
+                    bytesToRead = 64; //12+16+16+8+2+6+2+1+1;
+                }
+                read_state = 2;
+                std::cerr << "Request binary sensors" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+            } else if(getCameraData) { // Otherwise read once more the camera if enabled
+                headerReceived=false;
+                imgReceived=false;
+                wrongAnswer=true;
+
+                serialPort->write(command_cam, 2);
+                //serialPort->flush();
+                //serialPort->waitForBytesWritten(-1);
+                m_timer.start(TIMEOUT_MS);
+
+                headerReceived=true;
+                imgReceived=true;
+                wrongAnswer=false;
+                bytesToRead = pixNum+3;
+                read_state = 3;
+                std::cerr << "Request camera" << std::endl;
+                std::cerr << "Waiting for " << (int)bytesToRead << " bytes" << std::endl;
+            }
+            break;
+
+        case 4:
+            break;
+
+        case 5: // Reading ASCII sensors.
+        case 6:
+            break;
+
+        default:
+            std::cerr << "Uknown read_state (2)" << std::endl;
+            break;
+
+    }
+
+}
+
+void CommThread::closeCommunication(bool reconnect_flag, bool from_btn_disconnect) {
+    if(serialPort->isOpen()) {
+        serialPort->clear(QSerialPort::AllDirections);
+        serialPort->close();
+    }
+    m_timer.stop();
+    if(reconnect_flag) {
+        emit reconnect(); // Call CommThread->initConnection()
+    } else {
+        if(!from_btn_disconnect) {
+            emit portClosed(); // Call EpuckMonitor->disconnect() to "disable" interface
+        }
+    }
 }
 
 void CommThread::getImg(unsigned char *img) {
@@ -911,9 +806,9 @@ void CommThread::updateParameters(int t, int w, int h, int z) {
     comm->ReadBytes((BYTE*)RxBuffer,3,100000);
     comm->FlushCommPort();
 #else
-//    serialPort.write(command, strlen(command));
-//    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-//        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+//    serialPort->write(command, strlen(command));
+//    if(serialPort->waitForReadyRead(READ_TIMEOUT_MS)) {
+//        bytes=serialPort->read(RxBuffer, 3); //response is j\r\n
 //    } else {
 //        bytes=0;
 //    }
@@ -922,7 +817,7 @@ void CommThread::updateParameters(int t, int w, int h, int z) {
     return;
 }
 
-void CommThread::sendGoUp(int motorSpeed) {
+void CommThread::goForward() {
 
     int speed_left = motorSpeed;
     char high_left = (speed_left>>8) & 0xFF;
@@ -931,22 +826,17 @@ void CommThread::sendGoUp(int motorSpeed) {
     char high_right = (speed_right>>8) & 0xFF;
     char low_right = speed_right & 0xFF;
 
-    memset(command, 0x0, 20);
-    sprintf(command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
-
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 6);
-    comm->FlushCommPort();
-#else
-//    int bytes = serialPort.write(command, 6);
-#endif
+    memset(async_command, 0x0, 20);
+    sprintf(async_command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
+    cmd_list.push_back(std::string(async_command, 6));
+    cmd_list_len.push_back(6);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
 
     return;
 }
 
-void CommThread::sendGoDown(int motorSpeed) {
+void CommThread::goBackward() {
 
     int speed_left = -motorSpeed;
     char high_left = (speed_left>>8) & 0xFF;
@@ -955,22 +845,17 @@ void CommThread::sendGoDown(int motorSpeed) {
     char high_right = (speed_right>>8) & 0xFF;
     char low_right = speed_right & 0xFF;
 
-    memset(command, 0x0, 20);
-    sprintf(command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
-
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 6);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 6);
-#endif
+    memset(async_command, 0x0, 20);
+    sprintf(async_command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
+    cmd_list.push_back(std::string(async_command, 6));
+    cmd_list_len.push_back(6);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
 
     return;
 }
 
-void CommThread::sendGoLeft(int motorSpeed) {
+void CommThread::goLeft() {
 
     int speed_left = -motorSpeed;
     char high_left = (speed_left>>8) & 0xFF;
@@ -979,22 +864,17 @@ void CommThread::sendGoLeft(int motorSpeed) {
     char high_right = (speed_right>>8) & 0xFF;
     char low_right = speed_right & 0xFF;
 
-    memset(command, 0x0, 20);
-    sprintf(command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
-
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 6);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 6);
-#endif
+    memset(async_command, 0x0, 20);
+    sprintf(async_command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
+    cmd_list.push_back(std::string(async_command, 6));
+    cmd_list_len.push_back(6);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
 
     return;
 }
 
-void CommThread::sendGoRight(int motorSpeed) {
+void CommThread::goRight() {
 
     int speed_left = motorSpeed;
     char high_left = (speed_left>>8) & 0xFF;
@@ -1003,21 +883,17 @@ void CommThread::sendGoRight(int motorSpeed) {
     char high_right = (speed_right>>8) & 0xFF;
     char low_right = speed_right & 0xFF;
 
-    memset(command, 0x0, 20);
-    sprintf(command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 6);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 6);
-#endif
+    memset(async_command, 0x0, 20);
+    sprintf(async_command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
+    cmd_list.push_back(std::string(async_command, 6));
+    cmd_list_len.push_back(6);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
 
     return;
 }
 
-void CommThread::sendStop() {
+void CommThread::stopMotors() {
 
     int speed_left = 0;
     char high_left = (speed_left>>8) & 0xFF;
@@ -1026,543 +902,347 @@ void CommThread::sendStop() {
     char high_right = (speed_right>>8) & 0xFF;
     char low_right = speed_right & 0xFF;
 
-    memset(command, 0x0, 20);
-    sprintf(command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 6);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 6);
-#endif
+    memset(async_command, 0x0, 20);
+    sprintf(async_command, "%c%c%c%c%c%c",-'D', low_left, high_left, low_right, high_right,0);
+    cmd_list.push_back(std::string(async_command, 6));
+    cmd_list_len.push_back(6);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
 
     return;
-}
-
-void CommThread::sendUpdateLed0(int state) {
-
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 0, 1, 0);
-    } else {
-        sprintf(command, "%c%c%c%c",-'L', 0, 0, 0);
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 4);
-
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed1(int state) {
-    uint8_t bytesToSend = 0;
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        rgbLedState[0] = rgbLedValue[0];
-        rgbLedState[1] = rgbLedValue[1];
-        rgbLedState[2] = rgbLedValue[2];
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 1, 1, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    } else {
-        rgbLedState[0] = 0;
-        rgbLedState[1] = 0;
-        rgbLedState[2] = 0;
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 1, 0, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    }
-
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, bytesToSend);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, bytesToSend);
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed2(int state) {
-
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 2, 1, 0);
-    } else {
-        sprintf(command, "%c%c%c%c",-'L', 2, 0, 0);
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 4);
-
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed3(int state) {
-    uint8_t bytesToSend = 0;
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        rgbLedState[3] = rgbLedValue[0];
-        rgbLedState[4] = rgbLedValue[1];
-        rgbLedState[5] = rgbLedValue[2];
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 3, 1, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    } else {
-        rgbLedState[3] = 0;
-        rgbLedState[4] = 0;
-        rgbLedState[5] = 0;
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 3, 0, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, bytesToSend);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, bytesToSend);
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed4(int state) {
-
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 4, 1, 0);
-    } else {
-        sprintf(command, "%c%c%c%c",-'L', 4, 0, 0);
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 4);
-
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed5(int state) {
-    uint8_t bytesToSend = 0;
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        rgbLedState[6] = rgbLedValue[0];
-        rgbLedState[7] = rgbLedValue[1];
-        rgbLedState[8] = rgbLedValue[2];
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 5, 1, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    } else {
-        rgbLedState[6] = 0;
-        rgbLedState[7] = 0;
-        rgbLedState[8] = 0;
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 5, 0, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, bytesToSend);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, bytesToSend);
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed6(int state) {
-
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 6, 1, 0);
-    } else {
-        sprintf(command, "%c%c%c%c",-'L', 6, 0, 0);
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 4);
-
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed7(int state) {
-    uint8_t bytesToSend = 0;
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        rgbLedState[9] = rgbLedValue[0];
-        rgbLedState[10] = rgbLedValue[1];
-        rgbLedState[11] = rgbLedValue[2];
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 7, 1, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    } else {
-        rgbLedState[9] = 0;
-        rgbLedState[10] = 0;
-        rgbLedState[11] = 0;
-        if((int)asercomVer == 1) {
-            bytesToSend = 4;
-            sprintf(command, "%c%c%c%c",-'L', 7, 0, 0);
-        } else {
-            bytesToSend = 13;
-            sprintf(command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedState[0], rgbLedState[1], rgbLedState[2], rgbLedState[3], rgbLedState[4], rgbLedState[5], rgbLedState[6], rgbLedState[7], rgbLedState[8], rgbLedState[9], rgbLedState[10], rgbLedState[11]);
-        }
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, bytesToSend);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, bytesToSend);
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed8(int state) {
-
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 8, 1, 0);
-    } else {
-        sprintf(command, "%c%c%c%c",-'L', 8, 0, 0);
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 4);
-
-#endif
-
-    return;
-}
-
-void CommThread::sendUpdateLed9(int state) {
-
-    memset(command, 0x0, 20);
-
-    if(state == Qt::Checked) {
-        sprintf(command, "%c%c%c%c",-'L', 9, 1, 0);
-    } else {
-        sprintf(command, "%c%c%c%c",-'L', 9, 0, 0);
-    }
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)command, 4);
-    comm->FlushCommPort();
-#else
-//    serialPort.write(command, 4);
-
-#endif
-
-    return;
-}
-
-void CommThread::sendSound1() {
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)"T,1\r", 4);
-    comm->FlushCommPort();
-    comm->ReadBytes((BYTE*)RxBuffer,3,200000);
-#else
-    //serialPort.write("T,1\r",4);
-    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
-    //    } else {
-    //        bytes=0;
-    //    }
-#endif       
-
-    return;
-}
-
-void CommThread::sendSound2() {
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)"T,2\r", 4);
-    comm->FlushCommPort();
-    comm->ReadBytes((BYTE*)RxBuffer,3,200000);
-#else
-    //serialPort.write("T,2\r",4);
-    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
-    //    } else {
-    //        bytes=0;
-    //    }
-#endif
-
-    return;
-}
-
-void CommThread::sendSound3() {
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)"T,3\r", 4);
-    comm->FlushCommPort();
-    comm->ReadBytes((BYTE*)RxBuffer,3,200000);
-#else
-    //serialPort.write("T,3\r",4);
-    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
-    //    } else {
-    //        bytes=0;
-    //    }
-#endif
-
-    return;
-}
-
-void CommThread::sendSound4() {
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)"T,4\r", 4);
-    comm->FlushCommPort();
-    comm->ReadBytes((BYTE*)RxBuffer,3,200000);
-#else
-    //serialPort.write("T,4\r",4);
-    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
-    //    } else {
-    //        bytes=0;
-    //    }
-#endif
-
-    return;
-}
-
-void CommThread::sendSound5() {
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)"T,5\r", 4);
-    comm->FlushCommPort();
-    comm->ReadBytes((BYTE*)RxBuffer,3,200000);
-#else
-    //serialPort.write("T,5\r",4);
-    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
-    //    } else {
-    //        bytes=0;
-    //    }
-#endif
-
-    return;
-}
-
-void CommThread::sendAudioOff() {
-
-#ifdef __WIN32__
-    comm->PurgeCommPort();
-    comm->WriteBuffer((BYTE*)"T,6\r", 4);
-    comm->FlushCommPort();
-    comm->ReadBytes((BYTE*)RxBuffer,3,200000);
-#else
-    //serialPort.write("T,6\r",4);
-    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
-    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
-    //    } else {
-    //        bytes=0;
-    //    }
-#endif
-
-    return;
-}
-
-void CommThread::goUpSlot(int speed) {
-    goUpNow = true;
-    motorSpeed = speed;
-}
-
-void CommThread::goDownSlot(int speed) {
-    goDownNow = true;
-    motorSpeed = speed;
-}
-
-void CommThread::goLeftSlot(int speed) {
-    goLeftNow = true;
-    motorSpeed = speed;
-}
-
-void CommThread::goRightSlot(int speed) {
-    goRightNow = true;
-    motorSpeed = speed;
-}
-
-void CommThread::stopSlot() {
-    stopNow = true;
 }
 
 void CommThread::led0Slot(int state) {
-    stateLed0 = state;
-    updateLed0Now = true;
+
+    memset(async_command, 0x0, 20);
+
+    if(state == Qt::Checked) {
+        sprintf(async_command, "%c%c%c%c",-'L', 0, 1, 0);
+    } else {
+        sprintf(async_command, "%c%c%c%c",-'L', 0, 0, 0);
+    }
+
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led1Slot(int state) {
-    stateLed1 = state;
-    updateLed1Now = true;
+    memset(async_command, 0x0, 20);
+    int num_bytes = 0;
+    rgbLedState[0] = state;
+
+    if(state == Qt::Checked) {
+        rgbLedValue[0] = rgbLedDesiredValue[0];
+        rgbLedValue[1] = rgbLedDesiredValue[1];
+        rgbLedValue[2] = rgbLedDesiredValue[2];
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 1, 1, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    } else {
+        rgbLedValue[0] = 0;
+        rgbLedValue[1] = 0;
+        rgbLedValue[2] = 0;
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 1, 0, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    }
+
+    cmd_list.push_back(std::string(async_command, num_bytes));
+    cmd_list_len.push_back(num_bytes);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+    return;
 }
 
 void CommThread::led2Slot(int state) {
-    stateLed2 = state;
-    updateLed2Now = true;
+
+    memset(async_command, 0x0, 20);
+
+    if(state == Qt::Checked) {
+        sprintf(async_command, "%c%c%c%c",-'L', 2, 1, 0);
+    } else {
+        sprintf(async_command, "%c%c%c%c",-'L', 2, 0, 0);
+    }
+
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led3Slot(int state) {
-    stateLed3 = state;
-    updateLed3Now = true;
+    memset(async_command, 0x0, 20);
+    int num_bytes = 0;
+    rgbLedState[1] = state;
+
+    if(state == Qt::Checked) {
+        rgbLedValue[3] = rgbLedDesiredValue[0];
+        rgbLedValue[4] = rgbLedDesiredValue[1];
+        rgbLedValue[5] = rgbLedDesiredValue[2];
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 3, 1, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    } else {
+        rgbLedValue[3] = 0;
+        rgbLedValue[4] = 0;
+        rgbLedValue[5] = 0;
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 3, 0, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    }
+
+    cmd_list.push_back(std::string(async_command, num_bytes));
+    cmd_list_len.push_back(num_bytes);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led4Slot(int state) {
-    stateLed4 = state;
-    updateLed4Now = true;
+
+    memset(async_command, 0x0, 20);
+
+    if(state == Qt::Checked) {
+        sprintf(async_command, "%c%c%c%c",-'L', 4, 1, 0);
+    } else {
+        sprintf(async_command, "%c%c%c%c",-'L', 4, 0, 0);
+    }
+
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led5Slot(int state) {
-    stateLed5 = state;
-    updateLed5Now = true;
+    memset(async_command, 0x0, 20);
+    int num_bytes = 0;
+    rgbLedState[2] = state;
+
+    if(state == Qt::Checked) {
+        rgbLedValue[6] = rgbLedDesiredValue[0];
+        rgbLedValue[7] = rgbLedDesiredValue[1];
+        rgbLedValue[8] = rgbLedDesiredValue[2];
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 5, 1, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    } else {
+        rgbLedValue[6] = 0;
+        rgbLedValue[7] = 0;
+        rgbLedValue[8] = 0;
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 5, 0, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    }
+
+    cmd_list.push_back(std::string(async_command, num_bytes));
+    cmd_list_len.push_back(num_bytes);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led6Slot(int state) {
-    stateLed6 = state;
-    updateLed6Now = true;
+
+    memset(async_command, 0x0, 20);
+
+    if(state == Qt::Checked) {
+        sprintf(async_command, "%c%c%c%c",-'L', 6, 1, 0);
+    } else {
+        sprintf(async_command, "%c%c%c%c",-'L', 6, 0, 0);
+    }
+
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led7Slot(int state) {
-    stateLed7 = state;
-    updateLed7Now = true;
+    memset(async_command, 0x0, 20);
+    int num_bytes = 0;
+    rgbLedState[3] = state;
+
+    if(state == Qt::Checked) {
+        rgbLedValue[9] = rgbLedDesiredValue[0];
+        rgbLedValue[10] = rgbLedDesiredValue[1];
+        rgbLedValue[11] = rgbLedDesiredValue[2];
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 7, 1, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    } else {
+        rgbLedValue[9] = 0;
+        rgbLedValue[10] = 0;
+        rgbLedValue[11] = 0;
+        if((int)asercomVer == 1) {
+            num_bytes = 4;
+            sprintf(async_command, "%c%c%c%c",-'L', 7, 0, 0);
+        } else {
+            num_bytes = 13;
+            sprintf(async_command, "%c%c%c%c%c%c%c%c%c%c%c%c%c",-0x0A, rgbLedValue[0], rgbLedValue[1], rgbLedValue[2], rgbLedValue[3], rgbLedValue[4], rgbLedValue[5], rgbLedValue[6], rgbLedValue[7], rgbLedValue[8], rgbLedValue[9], rgbLedValue[10], rgbLedValue[11]);
+        }
+    }
+
+    cmd_list.push_back(std::string(async_command, num_bytes));
+    cmd_list_len.push_back(num_bytes);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led8Slot(int state) {
-    stateLed8 = state;
-    updateLed8Now = true;
+
+    memset(async_command, 0x0, 20);
+
+    if(state == Qt::Checked) {
+        sprintf(async_command, "%c%c%c%c",-'L', 8, 1, 0);
+    } else {
+        sprintf(async_command, "%c%c%c%c",-'L', 8, 0, 0);
+    }
+
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::led9Slot(int state) {
-    stateLed9 = state;
-    updateLed9Now = true;
+
+    memset(async_command, 0x0, 20);
+
+    if(state == Qt::Checked) {
+        sprintf(async_command, "%c%c%c%c",-'L', 9, 1, 0);
+    } else {
+        sprintf(async_command, "%c%c%c%c",-'L', 9, 0, 0);
+    }
+
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(false);
+    cmd_list_answer_len.push_back(0);
+
+    return;
 }
 
 void CommThread::sound1Slot() {
-    sound1Now = true;
+    sprintf(async_command, "%c%c%c%c",'T', ',', '1', '\r');
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(true);
+    cmd_list_answer_len.push_back(3);    //response is t\r\n
+    return;
 }
 
 void CommThread::sound2Slot() {
-    sound2Now = true;
+    sprintf(async_command, "%c%c%c%c",'T', ',', '2', '\r');
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(true);
+    cmd_list_answer_len.push_back(3);    //response is t\r\n
+    return;
 }
 
 void CommThread::sound3Slot() {
-    sound3Now = true;
+    sprintf(async_command, "%c%c%c%c",'T', ',', '3', '\r');
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(true);
+    cmd_list_answer_len.push_back(3);    //response is t\r\n
+    return;
 }
 
 void CommThread::sound4Slot() {
-    sound4Now = true;
+    sprintf(async_command, "%c%c%c%c",'T', ',', '4', '\r');
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(true);
+    cmd_list_answer_len.push_back(3);    //response is t\r\n
+    return;
 }
 
 void CommThread::sound5Slot() {
-    sound5Now = true;
+    sprintf(async_command, "%c%c%c%c",'T', ',', '5', '\r');
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(true);
+    cmd_list_answer_len.push_back(3);    //response is t\r\n
+    return;
 }
 
 void CommThread::audioOffSlot() {
-    audioOffNow = true;
+    sprintf(async_command, "%c%c%c%c",'T', ',', '6', '\r');
+    cmd_list.push_back(std::string(async_command, 4));
+    cmd_list_len.push_back(4);
+    cmd_list_need_answer.push_back(true);
+    cmd_list_answer_len.push_back(3);    //response is t\r\n
+    return;
 }
 
 void CommThread::updateRed(int value) {
-    rgbLedValue[0] = value;
-    updateLed1Now = true;
-    updateLed3Now = true;
-    updateLed5Now = true;
-    updateLed7Now = true;
+    rgbLedDesiredValue[0] = value;
+    led1Slot(rgbLedState[0]);
+    led3Slot(rgbLedState[1]);
+    led5Slot(rgbLedState[2]);
+    led7Slot(rgbLedState[3]);
 }
 
 void CommThread::updateGreen(int value) {
-    rgbLedValue[1] = value;
-    updateLed1Now = true;
-    updateLed3Now = true;
-    updateLed5Now = true;
-    updateLed7Now = true;
+    rgbLedDesiredValue[1] = value;
+    led1Slot(rgbLedState[0]);
+    led3Slot(rgbLedState[1]);
+    led5Slot(rgbLedState[2]);
+    led7Slot(rgbLedState[3]);
 }
 
 void CommThread::updateBlue(int value) {
-    rgbLedValue[2] = value;
-    updateLed1Now = true;
-    updateLed3Now = true;
-    updateLed5Now = true;
-    updateLed7Now = true;
+    rgbLedDesiredValue[2] = value;
+    led1Slot(rgbLedState[0]);
+    led3Slot(rgbLedState[1]);
+    led5Slot(rgbLedState[2]);
+    led7Slot(rgbLedState[3]);
 }
 
 

@@ -38,38 +38,29 @@
 #ifndef COMMTHREAD_H_
 #define COMMTHREAD_H_
 
-#include <QThread>
+#include <QMainWindow>
 #include <QMutex>
 #include <QSerialPort>
-#ifdef __WIN32__
-	#include "comm.h"
-#else
-	#include "SerialComm.h"
-#endif
+#include <QTimer>
 #include <math.h>
 #include <iostream>
 #include <stdio.h>
+#include <vector>
 
 #define IMAGE_BUFF_SIZE (4056+3)
-#define READ_TIMEOUT_MS 3000
+#define TIMEOUT_MS 3000
+#define MAX_CONN_TRIALS 5
+#define RX_BUFF_SIZE 64
 
-class CommThread : public QThread
+class CommThread : public QObject
 {
     Q_OBJECT
 
-        protected:
-		void run();
-
     public:
         ~CommThread();
-
-		#ifdef __WIN32__
-			void setComm(TCommPort *sc){comm=sc;}
-		#else
-			void setComm(SerialComm *sc){comm=sc;}
-        #endif
         void init();
-        void closeCommunication();
+        void setSpeed(int16_t speed) { motorSpeed=speed; }
+        void closeCommunication(bool reconnect_flag, bool from_btn_disconnect);
         float getAcceleration(){return acceleration;}
         float getOrientation(){return orientation;}
         float getInclination(){return inclination;}
@@ -110,11 +101,6 @@ class CommThread : public QThread
         uint8_t buttonIsPressed(void){return buttonState==1;}
 		uint8_t getMicroSdState(void){return microSdState;}
 
-        void sendGoUp(int motorSpeed);					/**< called when the "F" button is clicked; send the command to move forward the robot*/
-        void sendGoDown(int motorSpeed);					/**< called when the "B" button is clicked; send the command to move backward the robot*/
-        void sendGoLeft(int motorSpeed);					/**< called when the "L" button is clicked; send the command to turn left the robot*/
-        void sendGoRight(int motorSpeed);					/**< called when the "R" button is clicked; send the command to turn right the robot*/
-        void sendStop();					/**< called when the "S" button is clicked; send the command to stop the robot*/
         void sendUpdateLed0(int state);					/**< called when the "LED0" checkbox is checked/unchecked; send the command to turn on/off the LED0*/
         void sendUpdateLed1(int state);					/**< called when the "LED1" checkbox is checked/unchecked; send the command to turn on/off the LED1*/
         void sendUpdateLed2(int state);					/**< called when the "LED2" checkbox is checked/unchecked; send the command to turn on/off the LED2*/
@@ -135,7 +121,6 @@ class CommThread : public QThread
         bool headerReceived;					/**< boolean indicating whether or not the first three bytes of the image data (header) was received*/
         bool imgReceived;						/**< boolean indicating whether or not the image was received completely*/
         bool wrongAnswer;						/**< boolean indicating whether or not a wrong header was received*/
-        bool abortThread;
 
 	private:
         //QMutex *mutex;
@@ -146,7 +131,7 @@ class CommThread : public QThread
         uint16_t micVolume[4];								/**< microphone data*/
         char selectorStr[3];								/**< selector data*/
         char irCheckStr[8], irAddressStr[8], irDataStr[8];	/**< IR data*/
-        char RxBuffer[45];
+        char RxBuffer[RX_BUFF_SIZE];
         char command[20];
         unsigned char imgBuffer[IMAGE_BUFF_SIZE];				/**< image data; IMAGE_BUFF_SIZE is the maximum number of bytes that can be received at one time from the robot.*/
         unsigned int type;						/**< type of the image: color (value 1) or grayscale (value 0)*/
@@ -156,10 +141,6 @@ class CommThread : public QThread
         unsigned int zoom;
         bool getSensorsData;
         bool getCameraData;
-        bool goUpNow, goDownNow, goLeftNow, goRightNow, stopNow;
-        bool updateLed0Now, updateLed1Now, updateLed2Now, updateLed3Now, updateLed4Now, updateLed5Now, updateLed6Now, updateLed7Now, updateLed8Now, updateLed9Now;
-        bool sound1Now, sound2Now, sound3Now, sound4Now, sound5Now, audioOffNow;
-        int motorSpeed;
         int stateLed0, stateLed1, stateLed2, stateLed3, stateLed4, stateLed5, stateLed6, stateLed7, stateLed8, stateLed9;
         uint16_t batteryRaw;
         int16_t gyroRaw[3];
@@ -167,26 +148,51 @@ class CommThread : public QThread
         uint8_t asercomVer;
         uint16_t distanceCm;
         char distanceCmStr[5];
-        uint8_t rgbLedValue[3];
-        uint8_t rgbLedState[12];
+        uint8_t rgbLedDesiredValue[3];
+        uint8_t rgbLedValue[12];
+        int rgbLedState[4];
         uint8_t buttonState;
 		uint8_t microSdState;
         char portName[50];
-		#ifdef __WIN32__
-			TCommPort *comm;								/**< pointer to the serial port for the bluetooth device (Windows)*/
-		#else
-			SerialComm *comm;								/**< pointer to the serial port for the bluetooth device (Linux, MacOS)*/
-		#endif
-        QSerialPort serialPort;
+        QSerialPort *serialPort = nullptr;
+        uint8_t read_state;
+        uint8_t temp_buffer[100];
+        uint16_t packet_index;
+        uint16_t bytesToRead = 0;
+        uint16_t bytesRead = 0;
+        long  mantis=0;
+        short  exp=0;
+        float flt=0;
+        int selector;
+        int ir_check, ir_address, ir_data;
+        QTimer m_timer;
+        char async_command[20];
+        int16_t motorSpeed;
+        uint8_t test_state = 0;
+        std::vector<std::string> cmd_list;
+        std::vector<int> cmd_list_len;
+        std::vector<bool> cmd_list_need_answer;
+        std::vector<int> cmd_list_answer_len;
+        char command_sensors[20];
+        uint8_t bytesToSendSensors = 0;
+        char command_cam[20];
+        bool sending_async_commands = false;
+        uint8_t conn_state = 0;
+        uint8_t conn_trials = 0;
+        bool reading_ascii_data = false;
 
     public slots:
+        void handleTimeout();
+        void handleBytesWritten(qint64 bytes);
+        void readyRead();
+        void handleError(QSerialPort::SerialPortError error);
         void updateParameters(int t, int w, int h, int z);		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/
         void initConnection(char* portName);
-        void goUpSlot(int speed);
-        void goDownSlot(int speed);
-        void goLeftSlot(int speed);
-        void goRightSlot(int speed);
-        void stopSlot();
+        void goForward();   /**< called when the "F" button is clicked; send the command to move forward the robot*/
+        void goBackward();  /**< called when the "B" button is clicked; send the command to move backward the robot*/
+        void goLeft();      /**< called when the "L" button is clicked; send the command to turn left the robot*/
+        void goRight();     /**< called when the "R" button is clicked; send the command to turn right the robot*/
+        void stopMotors();  /**< called when the "S" button is clicked; send the command to stop the robot*/
         void led0Slot(int state);
         void led1Slot(int state);
         void led2Slot(int state);
@@ -211,7 +217,7 @@ class CommThread : public QThread
         void newBinaryData();
         void newAsciiData();
         void newImage();
-        void cannotOpenPort(QString s);
+        void printDialog(QString s);
         void portOpened();
         void showVersion(QString, int);
         void disconnect();

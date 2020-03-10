@@ -268,75 +268,19 @@ void EpuckMonitor::updateParameters() {
     return;
 }
 
-void EpuckMonitor::goUp() {
-
-    int speed_left = motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveForward(motorSpeed);
-
-    return;
-}
-
-void EpuckMonitor::goDown() {
-
-    int speed_left = -motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = -motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveBackward(motorSpeed);
-
-    return;
-}
-
-void EpuckMonitor::goLeft() {
-
-    int speed_left = -motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveLeft(motorSpeed);
-
-    return;
-}
-
-void EpuckMonitor::goRight() {
-
-    int speed_left = motorSpeed;
-    char high_left = (speed_left>>8) & 0xFF;
-    char low_left = speed_left & 0xFF;
-    int speed_right = -motorSpeed;
-    char high_right = (speed_right>>8) & 0xFF;
-    char low_right = speed_right & 0xFF;
-
-    emit moveRight(motorSpeed);
-
-    return;
-}
-
 void EpuckMonitor::updateSpeed() {
     char str[5];
     motorSpeed = ui.sliderVel->value();
     sprintf(str, "%4d", motorSpeed);
     ui.lblVelValue->setText(str);
+    commThread->setSpeed(motorSpeed);
 }
 
 void EpuckMonitor::disconnect() {
 
-    commThread->getSensors(false);
-    commThread->getCamera(false);
-    commThread->abortThread = true;
-    commThread->wait();
+    //commThread->getSensors(false);
+    //commThread->getCamera(false);
+    commThread->closeCommunication(false, true);
 
     //disable all graphical objects
     ui.btnConnect->setEnabled(true);
@@ -416,7 +360,7 @@ void EpuckMonitor::setCommThread(CommThread *thread) {
 void EpuckMonitor::portOpened() {
     ui.btnConnect->setEnabled(false);
     ui.btnDisconnect->setEnabled(true);
-    ui.chkSensors->setCheckState(Qt::Checked);
+    //ui.chkSensors->setCheckState(Qt::Checked);
 
     //enable all the graphical objects after the connection was established
     ui.chkSensors->setEnabled(true);
@@ -459,36 +403,62 @@ void EpuckMonitor::test() {
 
         // Turn on all leds.
         ui.checkLed0->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed0->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed1->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed1->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed2->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed2->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed3->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed3->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed4->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed4->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed5->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed5->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed6->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed6->setChecked(true);
+//       QThread::msleep(20);
         ui.checkLed7->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed7->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed8->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed8->setChecked(true);
+//        QThread::msleep(20);
         ui.checkLed9->setChecked(false);
+//        QThread::msleep(20);
         ui.checkLed9->setChecked(true);
+//        QThread::msleep(20);
         ui.slideRed->setValue(100);
+//        QThread::msleep(20);
         ui.slideGreen->setValue(0);
+//        QThread::msleep(20);
         ui.slideBlue->setValue(0);
-        rgbState = 1;
+//        QThread::msleep(20);
 
-        // Turn on sound.
-        ui.btn3->click();
+        rgbState = 1;
 
         // Turn on motors.
         ui.sliderVel->setValue(150);
         ui.btnUp->click();
+//        QThread::msleep(20);
+
+        // Turn on sound.
+        ui.btn3->click();
+//        QThread::msleep(20);
 
         testTimer->start(1000);
     } else {

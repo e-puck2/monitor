@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include <QtMath>
 #include <QTimer>
+#include <QThread>
 
 #define TEST_STOPPED 0
 #define TEST_STARTED 1
@@ -81,10 +82,6 @@ class EpuckMonitor : public QMainWindow
         void connect();					/**< called when the "Connect" button is clicked; initialize the connection and the threads*/
         void disconnect();				/**< called when the "Disconnect" button is clicked; stop the connection and the threads if they are running*/
         void updateParameters();		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/
-        void goUp();					/**< called when the "F" button is clicked; send the command to move forward the robot*/
-        void goDown();					/**< called when the "B" button is clicked; send the command to move backward the robot*/
-        void goLeft();					/**< called when the "L" button is clicked; send the command to turn left the robot*/
-        void goRight();					/**< called when the "R" button is clicked; send the command to turn right the robot*/
         void sensorActivation(int state);		/**< called when the "Activate Sensors" checkbox is checked/unchecked; activate/deactivate the threads for receiveing data from the sensors*/
         void updateSpeed();				/**< called when the slider changes its state; update the "motorSpeed" variable accordingly*/
         void binarySensorsUpdate();		/**< called when the "binaraySensorThread" terminates; update the graphical objects accordingly to the received data*/
@@ -98,10 +95,6 @@ class EpuckMonitor : public QMainWindow
 
     signals:
         void newParameters(int t, int w, int h, int z);
-        void moveForward(int motorSpeed);
-        void moveBackward(int motorSpeed);
-        void moveLeft(int motorSpeed);
-        void moveRight(int motorSpeed);
         void connectToRobot(char* portName);
         void new_x_angle(int value);
         void new_y_angle(int value);
