@@ -40,6 +40,7 @@ int main(int argc, char *argv[]) {
     main.show();
     QObject::connect(main.ui.btnConnect, SIGNAL(clicked()), &main, SLOT(connect()));
     QObject::connect(main.ui.btnDisconnect, SIGNAL(clicked()), &main, SLOT(disconnect()));
+    QObject::connect(commThread, SIGNAL(disconnect()), &main, SLOT(disconnect()));
     QObject::connect(commThread, SIGNAL(reconnect()), &main, SLOT(connect()));
     QObject::connect(main.ui.btnParameters, SIGNAL(clicked()), &main, SLOT(updateParameters()));
     QObject::connect(&main, SIGNAL(newParameters(int,int,int,int)), commThread, SLOT(updateParameters(int,int,int,int)));

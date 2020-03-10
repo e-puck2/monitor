@@ -14,5 +14,6 @@ unix {
 }
 
 QT 		+= core opengl widgets
+QT              += serialport
 FORMS		+= main.ui
 RESOURCES       += resources.qrc

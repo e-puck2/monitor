@@ -42,12 +42,16 @@ void CommThread::init() {
 }
 
 void CommThread::initConnection(char* portName) {
+    memset(this->portName, 0x0, 50);
+    memcpy(this->portName, portName, strlen(portName));
+
+
+
+
 
     char version[100];
     int err = 0;
-
-    memset(this->portName, 0x0, 50);
-    memcpy(this->portName, portName, strlen(portName));
+    //QSerialPort serialPort;
 
 #ifdef __WIN32__
 
@@ -78,41 +82,44 @@ void CommThread::initConnection(char* portName) {
     emit showVersion(&version[2], 0);
 
 #else
-    comm = new SerialComm();
-    err = comm->connect(portName);
-    if(err==-1) {
-        std::cerr << "Unable to open serial port " << portName << std::endl;
+    serialPort.setPortName(this->portName);
+    serialPort.setBaudRate(QSerialPort::Baud115200);
+
+    if (!serialPort.open(QIODevice::ReadWrite)) {
+        std::cerr << "Unable to open serial port " << portName << " (err = " << serialPort.error() << std::endl;
         emit cannotOpenPort("Unable to open serial port.");
         emit portClosed();
         return;
     }
 
     usleep(10000);
-    comm->flush();
-    while(comm->readData(version, 100, 200000)>0) {
-        std::cerr << version << std::endl;
-        memset(version, 0, 100);
-        usleep(10000);
-    }
+    serialPort.clear(QSerialPort::AllDirections);
 
     memset(command, 0x0, 20);
     sprintf(command, "\r");
-    comm->writeData(command, 1, 10000);        // clear output buffer
+    serialPort.write(command, 1);        // clear output buffer
     usleep(10000);
-    comm->readData(version, 100, 200000);
-
-    comm->flush();
-    while(comm->readData(version, 100, 200000)>0) {
-        std::cerr << version << std::endl;
-        memset(version, 0, 100);
-        usleep(10000);
+    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+        serialPort.read(version, 100);
+    } else {
+        std::cerr << "Error reading" << std::endl;
+        emit portClosed();
+        //return;
     }
 
+    //serialPort.clear(QSerialPort::AllDirections);
+
     sprintf(command, "V\r");
-    comm->writeData(command, 2, 10000);
+    serialPort.write(command, 2);
     usleep(10000);
     memset(version, 0x0, 100);
-    comm->readData(version, 100, 200000);
+    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+        serialPort.read(version, 100);
+    } else {
+        std::cerr << "Error reading" << std::endl;
+        emit portClosed();
+        //return;
+    }
     std::cerr << "version = " << version << std::endl;
     emit showVersion(&version[2], 0);
 
@@ -151,11 +158,20 @@ void CommThread::initConnection(char* portName) {
     getSensorsData = true;
     getCameraData = false;
 
+
+
+
+
+
+
+
     start();
 }
 
 CommThread::~CommThread() {
-
+    //if(serialPort.isOpen()) {
+    //    serialPort.close();
+    //}
 }
 
 void CommThread::closeCommunication() {
@@ -167,9 +183,8 @@ void CommThread::closeCommunication() {
         comm=NULL;
     }
 #else
-    if(comm!=NULL) {
-        comm->disconnect();
-        comm=NULL;
+    if(serialPort.isOpen()) {
+        serialPort.close();
     }
 #endif
     emit portClosed();
@@ -185,6 +200,16 @@ void CommThread::run() {
     uint8_t bytesToRead = 0;
     uint8_t bytesToSend = 0;
     bool reconnectFlag = false;
+
+
+
+
+
+
+
+
+
+
 
     abortThread = false;
 
@@ -224,8 +249,8 @@ void CommThread::run() {
             comm->FlushCommPort();
             Sleep(100);
         #else
-            comm->flush();
-            bytes=comm->writeData(command, bytesToSend, 1000000);
+            //comm->flush();
+            bytes=serialPort.write(command, bytesToSend);
         #endif
 
             //ACCELEROMETER DATA
@@ -260,12 +285,17 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes=comm->ReadBytes((BYTE*)RxBuffer,4,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,4,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, 4);
+            } else {
+                bytes=0;
+            }
         #endif
             mantis=0;
             exp=0;
             flt=0;
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<4) {	//data not received completely
@@ -285,11 +315,16 @@ void CommThread::run() {
             //read orientation
             memset(RxBuffer, 0x0, 45);            
         #ifdef __WIN32__
-            bytes=comm->ReadBytes((BYTE*)RxBuffer,4,1000000);
+            bytes=serialPort.writeBytes((BYTE*)RxBuffer,4,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,4,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, 4);
+            } else {
+                bytes=0;
+            }
         #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<4) {
@@ -316,9 +351,14 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes=comm->ReadBytes((BYTE*)RxBuffer,4,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,4,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, 4);
+            } else {
+                bytes=0;
+            }
         #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<4) {
@@ -345,9 +385,14 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes=comm->ReadBytes((BYTE*)RxBuffer,16,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,16,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, 16);
+            } else {
+                bytes=0;
+            }
         #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<16) {
@@ -402,9 +447,14 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes=comm->ReadBytes((BYTE*)RxBuffer,16,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,16,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, 16);
+            } else {
+                bytes=0;
+            }
         #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<16) {
@@ -437,9 +487,14 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes=comm->ReadBytes((BYTE*)RxBuffer,bytesToRead,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,bytesToRead,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, bytesToRead);
+            } else {
+                bytes=0;
+            }
         #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<bytesToRead) {
@@ -462,9 +517,14 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes=comm->ReadBytes((BYTE*)RxBuffer,2,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,2,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, 2);
+            } else {
+                bytes=0;
+            }
         #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<2) {
@@ -484,9 +544,14 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes=comm->ReadBytes((BYTE*)RxBuffer,6,1000000);
         #else
-            bytes=comm->readData((char*)RxBuffer,6,1000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read(RxBuffer, 6);
+            } else {
+                bytes=0;
+            }
         #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<6) {
@@ -509,9 +574,14 @@ void CommThread::run() {
             #ifdef __WIN32__
                 bytes=comm->ReadBytes((BYTE*)RxBuffer,2,1000000);
             #else
-                bytes=comm->readData((char*)RxBuffer,2,1000000);
+                if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                    bytes=serialPort.read(RxBuffer, 2);
+                } else {
+                    bytes=0;
+                }
             #endif
                 if(bytes == 0) {
+                    //emit disconnect();
                     reconnectFlag = true;
                     break;
                 } else if(bytes<2) {
@@ -531,9 +601,14 @@ void CommThread::run() {
             #ifdef __WIN32__
                 bytes=comm->ReadBytes((BYTE*)RxBuffer,1,1000000);
             #else
-                bytes=comm->readData((char*)RxBuffer,1,1000000);
+                if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                    bytes=serialPort.read(RxBuffer, 1);
+                } else {
+                    bytes=0;
+                }
             #endif
                 if(bytes == 0) {
+                    //emit disconnect();
                     reconnectFlag = true;
                     break;
                 } else if(bytes<1) {
@@ -548,9 +623,14 @@ void CommThread::run() {
             #ifdef __WIN32__
                 bytes=comm->ReadBytes((BYTE*)RxBuffer,1,1000000);
             #else
-                bytes=comm->readData((char*)RxBuffer,1,1000000);
+                if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                    bytes=serialPort.read(RxBuffer, 1);
+                } else {
+                    bytes=0;
+                }
             #endif
                 if(bytes == 0) {
+                    //emit disconnect();
                     reconnectFlag = true;
                     break;
                 } else if(bytes<1) {
@@ -573,11 +653,16 @@ void CommThread::run() {
                     Sleep(100);
                     bytes = comm->ReadBytes((BYTE*)RxBuffer,5,1000000);
             #else
-                    comm->flush();
-                    comm->writeData("C\r",2,1000000);
-                    bytes = comm->readData((char*)RxBuffer, 5, 1000000);
+                    //comm->flush();
+                    serialPort.write("C\r",2);
+                    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                        bytes=serialPort.read(RxBuffer, 5);
+                    } else {
+                        bytes=0;
+                    }
             #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<5) {
@@ -600,11 +685,16 @@ void CommThread::run() {
                     Sleep(100);
                     bytes = comm->ReadBytes((BYTE*)RxBuffer,45,1000000);
             #else
-                    comm->flush();
-                    comm->writeData("G\r",2,1000000);
-                    bytes = comm->readData((char*)RxBuffer, 45, 10000000);
+                    //comm->flush();
+                    serialPort.write("G\r",2);
+                    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                        bytes=serialPort.read(RxBuffer, 45);
+                    } else {
+                        bytes=0;
+                    }
             #endif
             if(bytes == 0) {
+                //emit disconnect();
                 reconnectFlag = true;
                 break;
             } else if(bytes<45) {
@@ -641,8 +731,8 @@ void CommThread::run() {
             comm->FlushCommPort();
             Sleep(100);
         #else
-            comm->flush();
-            bytes = comm->writeData(command,2,6000);
+            //comm->flush();
+            bytes = serialPort.write(command,2);
         #endif
 
             headerReceived=true;
@@ -653,7 +743,11 @@ void CommThread::run() {
         #ifdef __WIN32__
             bytes = comm->ReadBytes((BYTE*)imgBuffer,pixNum+3,1000000);
         #else
-            bytes = comm->readData((char*)imgBuffer, pixNum+3, 10000000);
+            if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+                bytes=serialPort.read((char*)imgBuffer, pixNum+3);
+            } else {
+                bytes=0;
+            }
         #endif
 
             emit newImage();
@@ -817,8 +911,12 @@ void CommThread::updateParameters(int t, int w, int h, int z) {
     comm->ReadBytes((BYTE*)RxBuffer,3,100000);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, strlen(command), 100000);
-    comm->readData(RxBuffer, 3, 100000);    //response is j\r\n
+//    serialPort.write(command, strlen(command));
+//    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+//        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+//    } else {
+//        bytes=0;
+//    }
 #endif
 
     return;
@@ -842,7 +940,7 @@ void CommThread::sendGoUp(int motorSpeed) {
     comm->WriteBuffer((BYTE*)command, 6);
     comm->FlushCommPort();
 #else
-    int bytes = comm->writeData(command, 6, 500000);
+//    int bytes = serialPort.write(command, 6);
 #endif
 
     return;
@@ -866,7 +964,7 @@ void CommThread::sendGoDown(int motorSpeed) {
     comm->WriteBuffer((BYTE*)command, 6);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 6, 20000);
+//    serialPort.write(command, 6);
 #endif
 
     return;
@@ -890,7 +988,7 @@ void CommThread::sendGoLeft(int motorSpeed) {
     comm->WriteBuffer((BYTE*)command, 6);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 6, 20000);
+//    serialPort.write(command, 6);
 #endif
 
     return;
@@ -913,7 +1011,7 @@ void CommThread::sendGoRight(int motorSpeed) {
     comm->WriteBuffer((BYTE*)command, 6);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 6, 20000);
+//    serialPort.write(command, 6);
 #endif
 
     return;
@@ -936,7 +1034,7 @@ void CommThread::sendStop() {
     comm->WriteBuffer((BYTE*)command, 6);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 6, 20000);
+//    serialPort.write(command, 6);
 #endif
 
     return;
@@ -957,7 +1055,7 @@ void CommThread::sendUpdateLed0(int state) {
     comm->WriteBuffer((BYTE*)command, 4);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
+//    serialPort.write(command, 4);
 
 #endif
 
@@ -998,7 +1096,7 @@ void CommThread::sendUpdateLed1(int state) {
     comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, bytesToSend, 12000);
+//    serialPort.write(command, bytesToSend);
 #endif
 
     return;
@@ -1019,7 +1117,7 @@ void CommThread::sendUpdateLed2(int state) {
     comm->WriteBuffer((BYTE*)command, 4);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
+//    serialPort.write(command, 4);
 
 #endif
 
@@ -1059,7 +1157,7 @@ void CommThread::sendUpdateLed3(int state) {
     comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, bytesToSend, 12000);
+//    serialPort.write(command, bytesToSend);
 #endif
 
     return;
@@ -1080,7 +1178,7 @@ void CommThread::sendUpdateLed4(int state) {
     comm->WriteBuffer((BYTE*)command, 4);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
+//    serialPort.write(command, 4);
 
 #endif
 
@@ -1120,7 +1218,7 @@ void CommThread::sendUpdateLed5(int state) {
     comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, bytesToSend, 12000);
+//    serialPort.write(command, bytesToSend);
 #endif
 
     return;
@@ -1141,7 +1239,7 @@ void CommThread::sendUpdateLed6(int state) {
     comm->WriteBuffer((BYTE*)command, 4);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
+//    serialPort.write(command, 4);
 
 #endif
 
@@ -1181,7 +1279,7 @@ void CommThread::sendUpdateLed7(int state) {
     comm->WriteBuffer((BYTE*)command, bytesToSend);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, bytesToSend, 12000);
+//    serialPort.write(command, bytesToSend);
 #endif
 
     return;
@@ -1202,7 +1300,7 @@ void CommThread::sendUpdateLed8(int state) {
     comm->WriteBuffer((BYTE*)command, 4);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
+//    serialPort.write(command, 4);
 
 #endif
 
@@ -1224,7 +1322,7 @@ void CommThread::sendUpdateLed9(int state) {
     comm->WriteBuffer((BYTE*)command, 4);
     comm->FlushCommPort();
 #else
-    comm->writeData(command, 4, 12000);
+//    serialPort.write(command, 4);
 
 #endif
 
@@ -1239,8 +1337,12 @@ void CommThread::sendSound1() {
     comm->FlushCommPort();
     comm->ReadBytes((BYTE*)RxBuffer,3,200000);
 #else
-    comm->writeData("T,1\r",4,12000);
-    comm->readData(RxBuffer,3,200000);
+    //serialPort.write("T,1\r",4);
+    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+    //    } else {
+    //        bytes=0;
+    //    }
 #endif       
 
     return;
@@ -1254,8 +1356,12 @@ void CommThread::sendSound2() {
     comm->FlushCommPort();
     comm->ReadBytes((BYTE*)RxBuffer,3,200000);
 #else
-    comm->writeData("T,2\r",4,12000);
-    comm->readData(RxBuffer,3,200000);
+    //serialPort.write("T,2\r",4);
+    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+    //    } else {
+    //        bytes=0;
+    //    }
 #endif
 
     return;
@@ -1269,8 +1375,12 @@ void CommThread::sendSound3() {
     comm->FlushCommPort();
     comm->ReadBytes((BYTE*)RxBuffer,3,200000);
 #else
-    comm->writeData("T,3\r",4,12000);
-    comm->readData(RxBuffer,3,200000);
+    //serialPort.write("T,3\r",4);
+    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+    //    } else {
+    //        bytes=0;
+    //    }
 #endif
 
     return;
@@ -1284,8 +1394,12 @@ void CommThread::sendSound4() {
     comm->FlushCommPort();
     comm->ReadBytes((BYTE*)RxBuffer,3,200000);
 #else
-    comm->writeData("T,4\r",4,12000);
-    comm->readData(RxBuffer,3,200000);
+    //serialPort.write("T,4\r",4);
+    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+    //    } else {
+    //        bytes=0;
+    //    }
 #endif
 
     return;
@@ -1299,8 +1413,12 @@ void CommThread::sendSound5() {
     comm->FlushCommPort();
     comm->ReadBytes((BYTE*)RxBuffer,3,200000);
 #else
-    comm->writeData("T,5\r",4,12000);
-    comm->readData(RxBuffer,3,200000);
+    //serialPort.write("T,5\r",4);
+    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+    //    } else {
+    //        bytes=0;
+    //    }
 #endif
 
     return;
@@ -1314,8 +1432,12 @@ void CommThread::sendAudioOff() {
     comm->FlushCommPort();
     comm->ReadBytes((BYTE*)RxBuffer,3,200000);
 #else
-    comm->writeData("T,6\r",4,12000);
-    comm->readData(RxBuffer,3,200000);
+    //serialPort.write("T,6\r",4);
+    //    if(serialPort.waitForReadyRead(READ_TIMEOUT_MS)) {
+    //        bytes=serialPort.read(RxBuffer, 3); //response is j\r\n
+    //    } else {
+    //        bytes=0;
+    //    }
 #endif
 
     return;

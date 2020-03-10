@@ -40,6 +40,7 @@
 
 #include <QThread>
 #include <QMutex>
+#include <QSerialPort>
 #ifdef __WIN32__
 	#include "comm.h"
 #else
@@ -50,6 +51,7 @@
 #include <stdio.h>
 
 #define IMAGE_BUFF_SIZE (4056+3)
+#define READ_TIMEOUT_MS 3000
 
 class CommThread : public QThread
 {
@@ -175,7 +177,7 @@ class CommThread : public QThread
 		#else
 			SerialComm *comm;								/**< pointer to the serial port for the bluetooth device (Linux, MacOS)*/
 		#endif
-
+        QSerialPort serialPort;
 
     public slots:
         void updateParameters(int t, int w, int h, int z);		/**< called when the "Send Parameters" button is clicked; send the command to the robot to change the camera parameters*/
@@ -212,6 +214,7 @@ class CommThread : public QThread
         void cannotOpenPort(QString s);
         void portOpened();
         void showVersion(QString, int);
+        void disconnect();
         void reconnect();
         void portClosed();
 
